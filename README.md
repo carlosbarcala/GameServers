@@ -40,13 +40,6 @@ Frontend web disponible en:
 
 - `GET /` -> panel visual para gestionar servidores
 
-## Acceso
-
-La aplicación usa autenticación básica HTTP.
-
-- Usuarios permitidos: `wnzero`, `barcalator`
-- Contraseña: `barcosyfrutas`
-
 ## Endpoints
 
 `GET /health`
@@ -70,17 +63,17 @@ La aplicación usa autenticación básica HTTP.
 
 ```bash
 # Estado general
-curl -u wnzero:barcosyfrutas http://127.0.0.1:3000/games
+curl -u user:pass http://127.0.0.1:3000/games
 
 # Ver IP del servidor
-curl -u wnzero:barcosyfrutas http://127.0.0.1:3000/server-info
+curl -u user:pass http://127.0.0.1:3000/server-info
 
 # Instalar Minecraft Java
-curl -u wnzero:barcosyfrutas -X POST http://127.0.0.1:3000/games/minecraft_java
+curl -u user:pass -X POST http://127.0.0.1:3000/games/minecraft_java
 
 # Reiniciar Bedrock
-curl -u barcalator:barcosyfrutas -X POST http://127.0.0.1:3000/games/minecraft_bedrock/restart
+curl -u user:pass -X POST http://127.0.0.1:3000/games/minecraft_bedrock/restart
 
 # Borrar Hytale
-curl -u wnzero:barcosyfrutas -X DELETE http://127.0.0.1:3000/games/hytale
+curl -u user:pass -X DELETE http://127.0.0.1:3000/games/hytale
 ```
