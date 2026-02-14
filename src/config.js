@@ -35,7 +35,7 @@ const GAMES = {
     protocol: "UDP",
     instanceDir: path.join(INSTANCES_DIR, "minecraft-bedrock"),
     downloadUrl:
-      "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.60.10.zip",
+      "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.0.2.zip",
     downloadFileName: "bedrock-server.zip",
     launchCommand: {
       bin: "./bedrock_server",
