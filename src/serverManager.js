@@ -310,16 +310,20 @@ async function installGame(gameId, log = () => { }) {
   await fs.mkdir(instancePath, { recursive: true });
 
   try {
-    log(`${gameId}: Descargando desde ${game.downloadUrl}...`);
-    await downloadFile(game.downloadUrl, downloadPath);
-    log(`${gameId}: Descarga completada`);
-
-    if (downloadPath.endsWith(".jar")) {
-      log(`${gameId}: Copiando archivo JAR...`);
-      await fs.copyFile(downloadPath, path.join(instancePath, "server.jar"));
+    if (gameId === "hytale") {
+      await installHytale(game, instancePath, log);
     } else {
-      log(`${gameId}: Extrayendo archivos...`);
-      await extractArchive(downloadPath, instancePath);
+      log(`${gameId}: Descargando desde ${game.downloadUrl}...`);
+      await downloadFile(game.downloadUrl, downloadPath);
+      log(`${gameId}: Descarga completada`);
+
+      if (downloadPath.endsWith(".jar")) {
+        log(`${gameId}: Copiando archivo JAR...`);
+        await fs.copyFile(downloadPath, path.join(instancePath, "server.jar"));
+      } else {
+        log(`${gameId}: Extrayendo archivos...`);
+        await extractArchive(downloadPath, instancePath);
+      }
     }
 
     log(`${gameId}: Aplicando configuración post-instalación...`);
