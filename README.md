@@ -36,6 +36,10 @@ node /ruta/al/proyecto/src/index.js
 
 Por defecto escucha en `:3000`. Puedes cambiarlo con `PORT`.
 
+Frontend web disponible en:
+
+- `GET /` -> panel visual para gestionar servidores
+
 ## Endpoints
 
 `GET /health`

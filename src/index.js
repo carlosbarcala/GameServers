@@ -1,4 +1,6 @@
 const http = require("node:http");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 const { URL } = require("node:url");
 const {
   ensureRuntimeContext,
@@ -9,6 +11,16 @@ const {
 } = require("./serverManager");
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+const PUBLIC_DIR = path.join(__dirname, "..", "public");
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".svg": "image/svg+xml"
+};
 
 function sendJson(res, code, payload) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
@@ -17,6 +29,29 @@ function sendJson(res, code, payload) {
 
 function normalizeGameId(raw) {
   return raw?.trim().toLowerCase();
+}
+
+async function serveStaticFile(urlPath, res) {
+  const staticPath = urlPath === "/" ? "/index.html" : urlPath;
+  const absolutePath = path.normalize(path.join(PUBLIC_DIR, staticPath));
+
+  if (!absolutePath.startsWith(PUBLIC_DIR)) {
+    return false;
+  }
+
+  try {
+    const data = await fs.readFile(absolutePath);
+    const ext = path.extname(absolutePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function handleRequest(req, res) {
@@ -51,6 +86,13 @@ async function handleRequest(req, res) {
         const gameId = normalizeGameId(parts[1]);
         const result = await restartGame(gameId);
         return sendJson(res, 200, result);
+      }
+    }
+
+    if (req.method === "GET") {
+      const served = await serveStaticFile(url.pathname, res);
+      if (served) {
+        return;
       }
     }
 

@@ -1,0 +1,250 @@
+:root {
+  --bg-0: #0d141e;
+  --bg-1: #13263a;
+  --bg-2: #1a3340;
+  --text: #e8f2ff;
+  --muted: #9cb0c8;
+  --accent: #44f5be;
+  --accent-2: #ff9966;
+  --danger: #ff4f5e;
+  --card: rgba(13, 24, 36, 0.82);
+  --card-border: rgba(134, 174, 207, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Chakra Petch", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 15% 10%, #26587a 0%, transparent 42%),
+    radial-gradient(circle at 85% 70%, #4b2f4f 0%, transparent 38%),
+    linear-gradient(160deg, var(--bg-0), var(--bg-1) 45%, var(--bg-2));
+  overflow-x: hidden;
+}
+
+.bg-glow {
+  position: fixed;
+  width: 22rem;
+  height: 22rem;
+  border-radius: 999px;
+  filter: blur(58px);
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.bg-glow-a {
+  background: #5fe0ff;
+  left: -5rem;
+  top: -6rem;
+}
+
+.bg-glow-b {
+  background: #ff8f6c;
+  right: -5rem;
+  bottom: -6rem;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  width: min(1100px, 92vw);
+  margin: 2rem auto 3rem;
+}
+
+.hero {
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  border-radius: 1rem;
+  padding: 1.25rem 1.3rem;
+  backdrop-filter: blur(10px);
+  animation: riseIn 500ms ease;
+}
+
+.eyebrow {
+  margin: 0;
+  font: 500 0.9rem "IBM Plex Mono", monospace;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0.35rem 0;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.hero-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cards {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  border-radius: 1rem;
+  padding: 1rem;
+  backdrop-filter: blur(8px);
+  animation: riseIn 550ms ease;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.game-name {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.meta {
+  margin: 0.65rem 0 0.9rem;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.86rem;
+}
+
+.status-pill {
+  font: 500 0.72rem "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.status-pill.is-running {
+  color: #b0ffe8;
+  background: rgba(68, 245, 190, 0.15);
+}
+
+.status-pill.is-stopped {
+  color: #ffd39d;
+  background: rgba(255, 153, 102, 0.16);
+}
+
+.status-pill.is-missing {
+  color: #ffc3c3;
+  background: rgba(255, 79, 94, 0.16);
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  padding: 0.52rem 0.8rem;
+  font: 600 0.88rem "Chakra Petch", sans-serif;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  color: #03130d;
+  background: linear-gradient(120deg, var(--accent), #84ffc2);
+  box-shadow: 0 7px 18px rgba(68, 245, 190, 0.35);
+}
+
+.btn-soft {
+  color: var(--text);
+  background: rgba(72, 108, 146, 0.28);
+  border-color: rgba(147, 182, 218, 0.3);
+}
+
+.btn-danger {
+  color: #ffd8dc;
+  background: rgba(188, 39, 57, 0.28);
+  border-color: rgba(255, 112, 124, 0.4);
+}
+
+.badge {
+  font: 500 0.8rem "IBM Plex Mono", monospace;
+  color: var(--muted);
+}
+
+.terminal {
+  margin-top: 1rem;
+  border: 1px solid var(--card-border);
+  background: rgba(3, 10, 17, 0.78);
+  border-radius: 1rem;
+  padding: 0.75rem 0.85rem;
+  animation: riseIn 600ms ease;
+}
+
+.terminal-title {
+  font: 500 0.78rem "IBM Plex Mono", monospace;
+  color: var(--accent-2);
+  margin-bottom: 0.4rem;
+}
+
+#logBox {
+  margin: 0;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+  font: 0.8rem/1.35 "IBM Plex Mono", monospace;
+  color: #b8c9dc;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .app {
+    margin-top: 1rem;
+  }
+
+  .hero {
+    padding: 1rem;
+  }
+
+  .card-actions .btn {
+    flex: 1 1 calc(50% - 0.3rem);
+  }
+}
