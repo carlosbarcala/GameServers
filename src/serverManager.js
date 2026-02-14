@@ -41,6 +41,7 @@ async function ensureRuntimeContext() {
 async function readState() {
   try {
     const raw = await fs.readFile(STATE_FILE, "utf8");
+    if (!raw.trim()) return {};
     return JSON.parse(raw);
   } catch (error) {
     if (error.code === "ENOENT") {

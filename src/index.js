@@ -7,10 +7,13 @@ const { WebSocketServer } = require("ws");
 const {
   ensureRuntimeContext,
   installGame,
+  startInstalledGame,
+  stopGame,
   restartGame,
   deleteGame,
   status
 } = require("./serverManager");
+const { log, logError } = require("./logger");
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -149,14 +152,16 @@ async function serveStaticFile(urlPath, res) {
 }
 
 async function handleRequest(req, res) {
-  if (!isAuthorized(req)) {
-    return sendUnauthorized(res);
-  }
-
   const url = new URL(req.url, `http://${req.headers.host}`);
   const parts = url.pathname.split("/").filter(Boolean);
 
+  // Logging de la petición
+  log(`${req.method} ${url.pathname} - IP: ${req.socket.remoteAddress}`);
+
   try {
+    if (!isAuthorized(req)) {
+      return sendUnauthorized(res);
+    }
     if (req.method === "GET" && url.pathname === "/health") {
       return sendJson(res, 200, { ok: true });
     }
@@ -220,6 +225,7 @@ async function handleRequest(req, res) {
       error: "Ruta no encontrada."
     });
   } catch (error) {
+    logError(`Error procesando ${req.method} ${url.pathname}`, error);
     return sendJson(res, 400, {
       ok: false,
       error: error.message

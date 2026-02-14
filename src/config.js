@@ -5,6 +5,7 @@ const BASE_DIR = isDev ? path.join(__dirname, "..", "game-data") : "/home/games"
 const INSTANCES_DIR = path.join(BASE_DIR, "instances");
 const DOWNLOADS_DIR = path.join(BASE_DIR, "downloads");
 const STATE_FILE = path.join(BASE_DIR, ".games-manager-state.json");
+const LOG_FILE = path.join(BASE_DIR, "app.log");
 
 const GAMES = {
   minecraft_java: {
@@ -92,5 +93,6 @@ module.exports = {
   DOWNLOADS_DIR,
   GAMES,
   INSTANCES_DIR,
-  STATE_FILE
+  STATE_FILE,
+  LOG_FILE
 };
