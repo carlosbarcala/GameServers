@@ -1,6 +1,7 @@
 const path = require("node:path");
 
-const BASE_DIR = "/home/games";
+const isDev = process.env.NODE_ENV === "development";
+const BASE_DIR = isDev ? path.join(__dirname, "..", "game-data") : "/home/games";
 const INSTANCES_DIR = path.join(BASE_DIR, "instances");
 const DOWNLOADS_DIR = path.join(BASE_DIR, "downloads");
 const STATE_FILE = path.join(BASE_DIR, ".games-manager-state.json");
@@ -9,6 +10,8 @@ const GAMES = {
   minecraft_java: {
     id: "minecraft_java",
     name: "Minecraft Java",
+    port: 25565,
+    protocol: "TCP",
     instanceDir: path.join(INSTANCES_DIR, "minecraft-java"),
     downloadUrl:
       "https://piston-data.mojang.com/v1/objects/4707d00eb834b446575d89a61a11b5d548d8c001/server.jar",
@@ -27,6 +30,8 @@ const GAMES = {
   minecraft_bedrock: {
     id: "minecraft_bedrock",
     name: "Minecraft Bedrock",
+    port: 19132,
+    protocol: "UDP",
     instanceDir: path.join(INSTANCES_DIR, "minecraft-bedrock"),
     downloadUrl:
       "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.60.10.zip",
@@ -40,14 +45,45 @@ const GAMES = {
   hytale: {
     id: "hytale",
     name: "Hytale",
+    port: 5520,
+    protocol: "UDP",
     instanceDir: path.join(INSTANCES_DIR, "hytale"),
-    downloadUrl: "https://cdn.hytale.com/server/linux/latest/hytale-server.tar.gz",
-    downloadFileName: "hytale-server.tar.gz",
+    // Hytale usa un downloader especial, no URL directa
+    downloadUrl: "https://downloader.hytale.com/hytale-downloader.zip",
+    downloadFileName: "hytale-downloader.zip",
+    downloaderBin: "hytale-downloader-linux-amd64",
+    requiresAuth: true, // Requiere autenticación OAuth2
     launchCommand: {
-      bin: "./hytale_server",
-      args: []
+      bin: "java",
+      args: [
+        "-Xms4G",
+        "-Xmx4G",
+        "-jar",
+        "Server/HytaleServer.jar",
+        "--assets",
+        "Assets.zip",
+        "--bind",
+        "0.0.0.0:5520"
+      ]
     },
-    postInstallFiles: []
+    postInstallFiles: [
+      {
+        file: "config.json",
+        content: JSON.stringify({
+          Version: 3,
+          ServerName: "Servidor Hytale",
+          MOTD: "Bienvenido al servidor",
+          Password: "",
+          MaxPlayers: 100,
+          MaxViewRadius: 12,
+          LocalCompressionEnabled: false,
+          DisplayTmpTagsInStrings: false,
+          PlayerStorage: {
+            Type: "Hytale"
+          }
+        }, null, 2) + "\n"
+      }
+    ]
   }
 };
 

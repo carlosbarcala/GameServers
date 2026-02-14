@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const { URL } = require("node:url");
+const { WebSocketServer } = require("ws");
 const {
   ensureRuntimeContext,
   installGame,
@@ -16,6 +17,26 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const AUTH_REALM = "Game Servers Manager";
 const ALLOWED_USERS = new Set(["wnzero", "barcalator"]);
 const ACCESS_PASSWORD = "barcosyfrutas";
+
+let wss = null;
+const wsClients = new Set();
+
+function broadcast(message) {
+  const payload = JSON.stringify({
+    type: "log",
+    timestamp: new Date().toISOString(),
+    message
+  });
+
+  for (const client of wsClients) {
+    if (client.readyState === 1) { // OPEN
+      client.send(payload);
+    }
+  }
+
+  // También log en consola del servidor
+  console.log(`[LOG] ${message}`);
+}
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -42,7 +63,8 @@ function getServerIps() {
   for (const networkEntries of Object.values(nets)) {
     if (!networkEntries) continue;
     for (const net of networkEntries) {
-      if (net.family === "IPv4" && !net.internal) {
+      // Solo IPv4, no internas, no localhost
+      if (net.family === "IPv4" && !net.internal && net.address !== "127.0.0.1") {
         ips.push(net.address);
       }
     }
@@ -157,20 +179,31 @@ async function handleRequest(req, res) {
       const gameId = normalizeGameId(parts[1]);
 
       if (req.method === "POST") {
-        const result = await installGame(gameId);
+        const result = await installGame(gameId, broadcast);
         return sendJson(res, 200, result);
       }
 
       if (req.method === "DELETE") {
-        const result = await deleteGame(gameId);
+        const result = await deleteGame(gameId, broadcast);
         return sendJson(res, 200, result);
       }
     }
 
-    if (parts.length === 3 && parts[0] === "games" && parts[2] === "restart") {
-      if (req.method === "POST") {
-        const gameId = normalizeGameId(parts[1]);
-        const result = await restartGame(gameId);
+    if (parts.length === 3 && parts[0] === "games") {
+      const gameId = normalizeGameId(parts[1]);
+
+      if (parts[2] === "restart" && req.method === "POST") {
+        const result = await restartGame(gameId, broadcast);
+        return sendJson(res, 200, result);
+      }
+
+      if (parts[2] === "start" && req.method === "POST") {
+        const result = await startInstalledGame(gameId, broadcast);
+        return sendJson(res, 200, result);
+      }
+
+      if (parts[2] === "stop" && req.method === "POST") {
+        const result = await stopGame(gameId, broadcast);
         return sendJson(res, 200, result);
       }
     }
@@ -203,9 +236,28 @@ async function bootstrap() {
     });
   });
 
+  // Configurar WebSocket server
+  wss = new WebSocketServer({ server });
+
+  wss.on("connection", (ws) => {
+    wsClients.add(ws);
+    console.log("[WS] Cliente conectado. Total:", wsClients.size);
+
+    ws.on("close", () => {
+      wsClients.delete(ws);
+      console.log("[WS] Cliente desconectado. Total:", wsClients.size);
+    });
+
+    ws.on("error", (error) => {
+      console.error("[WS] Error:", error.message);
+      wsClients.delete(ws);
+    });
+  });
+
   server.listen(PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`Game Servers Manager escuchando en http://0.0.0.0:${PORT}`);
+    console.log(`WebSocket server activo en ws://0.0.0.0:${PORT}`);
   });
 }
 

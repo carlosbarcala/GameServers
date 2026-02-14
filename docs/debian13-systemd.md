@@ -24,7 +24,7 @@ sudo chown -R games:games /home/games/apps/GameServers
 
 ```bash
 sudo apt update
-sudo apt install -y nodejs npm openjdk-21-jre-headless unzip tar curl
+sudo apt install -y nodejs npm openjdk-25-jdk unzip tar curl
 ```
 
 ## 4) Instalar dependencias Node de la app
@@ -59,10 +59,6 @@ WantedBy=multi-user.target
 
 Nota: La app valida que se ejecute como usuario `games` y desde `/home/games` o un subdirectorio.
 
-Credenciales de acceso de la aplicación (Basic Auth):
-- Usuarios: `wnzero`, `barcalator`
-- Contraseña: `barcosyfrutas`
-
 ## 6) Activar y arrancar
 
 ```bash
@@ -75,8 +71,6 @@ sudo systemctl enable --now game-servers-manager.service
 ```bash
 sudo systemctl status game-servers-manager.service
 sudo journalctl -u game-servers-manager.service -f
-curl -u wnzero:barcosyfrutas http://127.0.0.1:3000/health
-curl -u wnzero:barcosyfrutas http://127.0.0.1:3000/games
 ```
 
 ## 8) Operaciones del servicio
@@ -87,10 +81,3 @@ sudo systemctl stop game-servers-manager.service
 sudo systemctl start game-servers-manager.service
 ```
 
-## 9) Endpoints de uso rápido
-
-```bash
-curl -u wnzero:barcosyfrutas -X POST http://127.0.0.1:3000/games/minecraft_java
-curl -u barcalator:barcosyfrutas -X POST http://127.0.0.1:3000/games/minecraft_bedrock/restart
-curl -u wnzero:barcosyfrutas -X DELETE http://127.0.0.1:3000/games/hytale
-```
