@@ -2,6 +2,7 @@ const GAME_IDS = ["minecraft_java", "minecraft_bedrock", "hytale"];
 
 const cardsEl = document.querySelector("#cards");
 const healthBadgeEl = document.querySelector("#healthBadge");
+const serverIpEl = document.querySelector("#serverIp");
 const logBoxEl = document.querySelector("#logBox");
 const refreshBtnEl = document.querySelector("#refreshBtn");
 const template = document.querySelector("#gameCardTemplate");
@@ -36,6 +37,22 @@ async function checkHealth() {
     healthBadgeEl.textContent = "API activa";
   } catch (_error) {
     healthBadgeEl.textContent = "API sin respuesta";
+  }
+}
+
+async function loadServerIp() {
+  try {
+    const payload = await request("/server-info");
+    const ips = payload.data?.ips ?? [];
+    const port = payload.data?.port ?? 3000;
+    if (ips.length === 0) {
+      serverIpEl.textContent = `IP del servidor: no detectada (puerto ${port})`;
+      return;
+    }
+    const urls = ips.map((ip) => `http://${ip}:${port}`);
+    serverIpEl.textContent = `IP del servidor: ${urls.join(" | ")}`;
+  } catch (_error) {
+    serverIpEl.textContent = "IP del servidor: no disponible";
   }
 }
 
@@ -142,6 +159,7 @@ refreshBtnEl.addEventListener("click", async () => {
 async function init() {
   setBusy(true);
   await checkHealth();
+  await loadServerIp();
   try {
     await refreshStatus();
     pushLog("panel listo");

@@ -200,6 +200,12 @@ h1 {
   color: var(--muted);
 }
 
+.server-ip {
+  margin: 0.75rem 0 0;
+  font: 500 0.82rem "IBM Plex Mono", monospace;
+  color: #c6d8ee;
+}
+
 .terminal {
   margin-top: 1rem;
   border: 1px solid var(--card-border);
