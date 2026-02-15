@@ -79,29 +79,52 @@ async function stopGame(gameId, log = () => { }) {
   const state = await readState();
   const entry = state[gameId];
 
-  if (!entry?.pid || !isProcessAlive(entry.pid)) {
-    log(`${gameId}: No había proceso activo`);
-    return { ok: true, message: "No había proceso activo." };
+  // Verificar si hay una sesión de screen activa
+  if (!entry?.screenName) {
+    log(`${gameId}: No había sesión de screen activa`);
+    return { ok: true, message: "No había sesión activa." };
   }
 
-  log(`${gameId}: Deteniendo proceso (PID ${entry.pid})...`);
-  process.kill(entry.pid, "SIGTERM");
-
-  let retries = 10;
-  while (retries > 0 && isProcessAlive(entry.pid)) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    retries -= 1;
+  const isRunning = await isScreenSessionAlive(entry.screenName);
+  if (!isRunning) {
+    log(`${gameId}: La sesión de screen ya no estaba activa`);
+    delete state[gameId].screenName;
+    await writeState(state);
+    return { ok: true, message: "La sesión ya no estaba activa." };
   }
 
-  if (isProcessAlive(entry.pid)) {
-    log(`${gameId}: Forzando detención (SIGKILL)`);
-    process.kill(entry.pid, "SIGKILL");
-  }
+  log(`${gameId}: Deteniendo sesión de screen "${entry.screenName}"...`);
 
-  delete state[gameId];
-  await writeState(state);
-  log(`${gameId}: Proceso detenido correctamente`);
-  return { ok: true, message: "Proceso detenido." };
+  try {
+    // Enviar comando 'stop' al servidor (para servidores que lo soporten)
+    try {
+      await sendCommandToScreen(entry.screenName, "stop");
+      log(`${gameId}: Comando 'stop' enviado, esperando cierre graceful...`);
+
+      // Esperar hasta 10 segundos para que el servidor se cierre
+      let retries = 20;
+      while (retries > 0 && await isScreenSessionAlive(entry.screenName)) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        retries -= 1;
+      }
+    } catch (error) {
+      log(`${gameId}: No se pudo enviar comando stop: ${error.message}`);
+    }
+
+    // Si todavía está activo, forzar cierre de la sesión
+    if (await isScreenSessionAlive(entry.screenName)) {
+      log(`${gameId}: Forzando cierre de sesión de screen...`);
+      await runCommand("screen", ["-S", entry.screenName, "-X", "quit"], BASE_DIR);
+    }
+
+    delete state[gameId].screenName;
+    await writeState(state);
+    log(`${gameId}: Sesión de screen detenida correctamente`);
+    return { ok: true, message: "Servidor detenido." };
+  } catch (error) {
+    log(`${gameId}: Error al detener sesión: ${error.message}`);
+    throw error;
+  }
 }
 
 function downloadFile(url, targetPath) {
@@ -167,31 +190,100 @@ async function startInstalledGame(gameId, log = () => { }) {
   const instancePath = game.instanceDir;
   const state = await readState();
 
-  if (state[gameId]?.pid && isProcessAlive(state[gameId].pid)) {
-    log(`${gameId}: Ya estaba ejecutándose (PID ${state[gameId].pid})`);
-    return { ok: true, message: "Ya estaba ejecutándose.", pid: state[gameId].pid };
+  // Nombre de la sesión de screen
+  const screenName = `gameserver-${gameId}`;
+
+  // Verificar si ya hay una sesión de screen activa
+  if (state[gameId]?.screenName) {
+    const isRunning = await isScreenSessionAlive(state[gameId].screenName);
+    if (isRunning) {
+      log(`${gameId}: Ya estaba ejecutándose en screen session ${state[gameId].screenName}`);
+      return { ok: true, message: "Ya estaba ejecutándose.", screenName: state[gameId].screenName };
+    }
   }
 
-  log(`${gameId}: Iniciando servidor...`);
-  const outLog = fsSync.openSync(path.join(instancePath, "stdout.log"), "a");
-  const errLog = fsSync.openSync(path.join(instancePath, "stderr.log"), "a");
+  log(`${gameId}: Iniciando servidor en screen session...`);
 
-  const child = spawn(game.launchCommand.bin, game.launchCommand.args, {
-    cwd: instancePath,
-    detached: true,
-    stdio: ["ignore", outLog, errLog]
-  });
+  // Usar parámetros personalizados si existen, sino usar los por defecto
+  let launchArgs = [...game.launchCommand.args];
 
-  child.unref();
+  if (state[gameId]?.params) {
+    // Parsear parámetros personalizados y reemplazar los parámetros JVM
+    const customParams = state[gameId].params.trim().split(/\s+/);
 
-  state[gameId] = {
-    pid: child.pid,
-    updatedAt: new Date().toISOString()
-  };
-  await writeState(state);
+    // Filtrar los parámetros JVM por defecto (-Xms, -Xmx)
+    launchArgs = launchArgs.filter(arg => !arg.startsWith("-Xms") && !arg.startsWith("-Xmx"));
 
-  log(`${gameId}: Servidor iniciado con PID ${child.pid}`);
-  return { ok: true, message: "Servidor iniciado.", pid: child.pid };
+    // Añadir parámetros personalizados al inicio
+    launchArgs = [...customParams, ...launchArgs];
+
+    log(`${gameId}: Usando parámetros personalizados: ${customParams.join(" ")}`);
+  }
+
+  // Construir el comando completo
+  const fullCommand = `${game.launchCommand.bin} ${launchArgs.join(" ")}`;
+
+  // Crear sesión de screen y ejecutar el comando
+  // -dmS: crear sesión detached con nombre
+  // -L: habilitar logging
+  // -Logfile: especificar archivo de log
+  const logFile = path.join(instancePath, "screen.log");
+
+  try {
+    await runCommand("screen", [
+      "-dmS", screenName,
+      "-L",
+      "-Logfile", logFile,
+      "bash", "-c",
+      `cd ${instancePath} && ${fullCommand}`
+    ], BASE_DIR);
+
+    // Esperar un momento para que la sesión se inicie
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Verificar que la sesión se creó correctamente
+    const isRunning = await isScreenSessionAlive(screenName);
+    if (!isRunning) {
+      throw new Error("La sesión de screen no se pudo iniciar correctamente");
+    }
+
+    state[gameId] = {
+      ...state[gameId],
+      screenName: screenName,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Eliminar pid antiguo si existe
+    delete state[gameId].pid;
+
+    await writeState(state);
+
+    log(`${gameId}: Servidor iniciado en screen session "${screenName}"`);
+    return { ok: true, message: "Servidor iniciado.", screenName: screenName };
+  } catch (error) {
+    log(`${gameId}: Error al iniciar screen session: ${error.message}`);
+    throw error;
+  }
+}
+
+// Verificar si una sesión de screen está activa
+async function isScreenSessionAlive(screenName) {
+  try {
+    await runCommand("screen", ["-list", screenName], BASE_DIR);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Enviar comando a una sesión de screen
+async function sendCommandToScreen(screenName, command) {
+  // screen -S <name> -X stuff "command\n"
+  await runCommand("screen", [
+    "-S", screenName,
+    "-X", "stuff",
+    `${command}\n`
+  ], BASE_DIR);
 }
 
 // Función especial para instalar Hytale usando el downloader oficial
@@ -337,7 +429,7 @@ async function installGame(gameId, log = () => { }) {
       ok: true,
       game: gameId,
       message: `Instalado e iniciado: ${game.name}.`,
-      pid: startResult.pid
+      screenName: startResult.screenName
     };
   } catch (error) {
     log(`${gameId}: ✗ Error durante instalación: ${error.message}`);
@@ -373,15 +465,16 @@ async function status() {
   const state = await readState();
   const result = {};
   for (const [id, game] of Object.entries(GAMES)) {
-    const pid = state[id]?.pid ?? null;
-    const running = pid ? isProcessAlive(pid) : false;
+    const screenName = state[id]?.screenName ?? null;
+    const running = screenName ? await isScreenSessionAlive(screenName) : false;
     result[id] = {
       name: game.name,
       port: game.port,
       protocol: game.protocol,
       installed: await pathExists(game.instanceDir),
       running,
-      pid: running ? pid : null
+      screenName: running ? screenName : null,
+      params: state[id]?.params || "" // Incluir parámetros guardados
     };
   }
   return result;
@@ -396,6 +489,107 @@ async function pathExists(filePath) {
   }
 }
 
+// Guardar parámetros personalizados para un juego
+async function saveParams(gameId, params) {
+  getGame(gameId); // Validar que el juego existe
+  const state = await readState();
+
+  if (!state[gameId]) {
+    state[gameId] = {};
+  }
+
+  state[gameId].params = params;
+  await writeState(state);
+
+  return { ok: true, message: "Parámetros guardados." };
+}
+
+// Guardar contraseña para un juego
+async function savePassword(gameId, password) {
+  const game = getGame(gameId);
+  const instancePath = game.instanceDir;
+
+  // Verificar que el juego está instalado
+  if (!await pathExists(instancePath)) {
+    throw new Error(`El juego ${gameId} no está instalado.`);
+  }
+
+  // Guardar contraseña según el tipo de juego
+  if (gameId === "minecraft_java") {
+    // Minecraft Java: modificar server.properties
+    const propsPath = path.join(instancePath, "server.properties");
+    let content = "";
+
+    try {
+      content = await fs.readFile(propsPath, "utf8");
+    } catch (error) {
+      // Si no existe, crear uno básico
+      content = "";
+    }
+
+    // Actualizar o añadir la línea de contraseña
+    const lines = content.split("\n");
+    let found = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith("server-password=")) {
+        lines[i] = `server-password=${password}`;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      lines.push(`server-password=${password}`);
+    }
+
+    await fs.writeFile(propsPath, lines.join("\n"), "utf8");
+
+  } else if (gameId === "minecraft_bedrock") {
+    // Minecraft Bedrock: modificar server.properties
+    const propsPath = path.join(instancePath, "server.properties");
+    let content = "";
+
+    try {
+      content = await fs.readFile(propsPath, "utf8");
+    } catch (error) {
+      content = "";
+    }
+
+    const lines = content.split("\n");
+    let found = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith("server-password=")) {
+        lines[i] = `server-password=${password}`;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      lines.push(`server-password=${password}`);
+    }
+
+    await fs.writeFile(propsPath, lines.join("\n"), "utf8");
+
+  } else if (gameId === "hytale") {
+    // Hytale: modificar config.json
+    const configPath = path.join(instancePath, "config.json");
+
+    try {
+      const configContent = await fs.readFile(configPath, "utf8");
+      const config = JSON.parse(configContent);
+      config.Password = password;
+      await fs.writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+    } catch (error) {
+      throw new Error(`No se pudo actualizar la contraseña en config.json: ${error.message}`);
+    }
+  }
+
+  return { ok: true, message: "Contraseña actualizada." };
+}
+
 module.exports = {
   ensureRuntimeContext,
   installGame,
@@ -403,5 +597,8 @@ module.exports = {
   stopGame,
   restartGame,
   deleteGame,
-  status
+  status,
+  saveParams,
+  savePassword,
+  sendCommandToScreen
 };

@@ -18,9 +18,7 @@ function connectWebSocket() {
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    wsStatusEl.textContent = "WebSocket conectado";
-    wsStatusEl.classList.add("connected");
-    pushLog("🔌 Conectado al servidor WebSocket");
+    // Conexión establecida silenciosamente
   };
 
   ws.onmessage = (event) => {
@@ -36,15 +34,9 @@ function connectWebSocket() {
 
   ws.onerror = (error) => {
     console.error("WebSocket error:", error);
-    wsStatusEl.textContent = "WebSocket error";
-    wsStatusEl.classList.remove("connected");
   };
 
   ws.onclose = () => {
-    wsStatusEl.textContent = "WebSocket desconectado";
-    wsStatusEl.classList.remove("connected");
-    pushLog("🔌 Desconectado del servidor WebSocket");
-
     // Reconectar después de 3 segundos
     setTimeout(connectWebSocket, 3000);
   };
@@ -72,8 +64,13 @@ function setBusy(value) {
   }
 }
 
-async function request(url, method = "GET") {
-  const response = await fetch(url, { method });
+async function request(url, method = "GET", body = null) {
+  const options = { method };
+  if (body) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
   const data = await response.json();
   if (!response.ok || data.ok === false) {
     throw new Error(data.error || "Error inesperado");
@@ -118,10 +115,8 @@ function statusText(game) {
 }
 
 function buildMeta(game, gameId) {
-  const pidText = game.pid ? `PID ${game.pid}` : "PID -";
-  const installText = game.installed ? "instancia presente" : "sin instancia";
   const portInfo = game.port ? `Puerto ${game.port}/${game.protocol || "TCP"}` : "";
-  return `${gameId} | ${installText} | ${pidText}${portInfo ? " | " + portInfo : ""}`;
+  return portInfo;
 }
 
 function getGameLogo(gameId) {
@@ -146,6 +141,7 @@ function renderCards(data) {
     const nameEl = node.querySelector(".game-name");
     const pill = node.querySelector(".status-pill");
     const meta = node.querySelector(".meta");
+    const paramInput = node.querySelector(".param-input");
     const actionButtons = node.querySelectorAll("button[data-action]");
 
     const logoSrc = getGameLogo(gameId);
@@ -159,6 +155,58 @@ function renderCards(data) {
     pill.classList.add(statusClass(game));
     meta.textContent = buildMeta(game, gameId);
 
+    // Ocultar parámetros para juegos que no usan Java
+    const serverParamsEl = node.querySelector(".server-params");
+    if (gameId === "minecraft_bedrock") {
+      serverParamsEl.style.display = "none";
+    }
+
+    // Configurar campo de parámetros
+    if (game.params) {
+      paramInput.value = game.params;
+    }
+
+    // Deshabilitar edición si el servidor está corriendo
+    paramInput.disabled = game.running;
+
+    // Guardar parámetros cuando cambian
+    paramInput.addEventListener("blur", async () => {
+      if (!game.running && paramInput.value !== game.params) {
+        try {
+          await request(`/games/${gameId}/params`, "POST", { params: paramInput.value });
+          pushLog(`${gameId}: parámetros actualizados`);
+        } catch (error) {
+          pushLog(`${gameId}: error al actualizar parámetros - ${error.message}`);
+        }
+      }
+    });
+
+    // Configurar consola
+    const consoleEl = node.querySelector(".server-console");
+    const consoleInput = node.querySelector(".console-input");
+    const consoleBtn = node.querySelector(".btn-console-send");
+
+    if (game.running) {
+      consoleEl.style.display = "block";
+
+      const sendCmd = async () => {
+        const command = consoleInput.value.trim();
+        if (!command) return;
+        try {
+          await request(`/games/${gameId}/command`, "POST", { command });
+          consoleInput.value = "";
+          pushLog(`${gameId} > ${command}`);
+        } catch (error) {
+          pushLog(`${gameId}: error al enviar comando - ${error.message}`);
+        }
+      };
+
+      consoleBtn.addEventListener("click", sendCmd);
+      consoleInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendCmd();
+      });
+    }
+
     for (const button of actionButtons) {
       const action = button.dataset.action;
       button.addEventListener("click", () => runAction(gameId, action));
@@ -170,11 +218,11 @@ function renderCards(data) {
         // NO INSTALADO: solo mostrar "Instalar"
         shouldShow = action === "install";
       } else if (game.running) {
-        // ACTIVO: mostrar "Parar", "Reiniciar", "Eliminar"
-        shouldShow = action === "stop" || action === "restart" || action === "delete";
+        // ACTIVO: mostrar "Parar", "Reiniciar", "Eliminar", "Contraseña"
+        shouldShow = action === "stop" || action === "restart" || action === "delete" || action === "password";
       } else {
-        // INSTALADO (parado): mostrar "Iniciar", "Eliminar"
-        shouldShow = action === "start" || action === "delete";
+        // INSTALADO (parado): mostrar "Iniciar", "Eliminar", "Contraseña"
+        shouldShow = action === "start" || action === "delete" || action === "password";
       }
 
       if (!shouldShow) {
@@ -208,6 +256,16 @@ async function runAction(gameId, action) {
     } else if (action === "restart") {
       await request(`/games/${gameId}/restart`, "POST");
       pushLog(`${gameId}: reinicio solicitado`);
+    } else if (action === "password") {
+      const newPassword = window.prompt(
+        `Introduce la nueva contraseña para ${gameId}:`
+      );
+      if (newPassword === null) {
+        setBusy(false);
+        return;
+      }
+      await request(`/games/${gameId}/password`, "POST", { password: newPassword });
+      pushLog(`${gameId}: contraseña actualizada`);
     } else if (action === "delete") {
       const confirmDelete = window.confirm(
         `Se eliminará por completo la instancia de ${gameId}. ¿Continuar?`

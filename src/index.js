@@ -11,7 +11,10 @@ const {
   stopGame,
   restartGame,
   deleteGame,
-  status
+  status,
+  saveParams,
+  savePassword,
+  sendCommandToScreen
 } = require("./serverManager");
 const { log, logError } = require("./logger");
 
@@ -151,6 +154,24 @@ async function serveStaticFile(urlPath, res) {
   }
 }
 
+// Leer body JSON de una petición
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk.toString();
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(new Error("JSON inválido"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
 async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const parts = url.pathname.split("/").filter(Boolean);
@@ -210,6 +231,33 @@ async function handleRequest(req, res) {
       if (parts[2] === "stop" && req.method === "POST") {
         const result = await stopGame(gameId, broadcast);
         return sendJson(res, 200, result);
+      }
+
+      if (parts[2] === "params" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const result = await saveParams(gameId, body.params || "");
+        return sendJson(res, 200, result);
+      }
+
+      if (parts[2] === "password" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const result = await savePassword(gameId, body.password || "");
+        broadcast(`${gameId}: contraseña actualizada`);
+        return sendJson(res, 200, result);
+      }
+
+      if (parts[2] === "command" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const gameStatus = await status();
+        const screenName = gameStatus[gameId]?.screenName;
+
+        if (!screenName) {
+          throw new Error("El servidor no está en ejecución.");
+        }
+
+        await sendCommandToScreen(screenName, body.command);
+        broadcast(`${gameId}: comando enviado -> ${body.command}`);
+        return sendJson(res, 200, { ok: true, message: "Comando enviado." });
       }
     }
 

@@ -46,11 +46,29 @@
         </div>
       </div>
       <p class="meta"></p>
+
+      <!-- Parámetros del servidor -->
+      <div class="server-params">
+        <label class="param-label">Parámetros JVM:</label>
+        <input type="text" class="param-input" placeholder="-Xms4G -Xmx4G" />
+        <small class="param-hint">Editable solo cuando el servidor está parado</small>
+      </div>
+
+      <!-- Consola de comandos -->
+      <div class="server-console" style="display: none;">
+        <label class="param-label">Consola:</label>
+        <div class="console-input-group">
+          <input type="text" class="console-input" placeholder="Enviar comando..." />
+          <button class="btn btn-primary btn-console-send">></button>
+        </div>
+      </div>
+
       <div class="card-actions">
         <button data-action="install" class="btn btn-primary">Instalar</button>
         <button data-action="start" class="btn btn-soft">Iniciar</button>
         <button data-action="stop" class="btn btn-soft">Parar</button>
         <button data-action="restart" class="btn btn-soft">Reiniciar</button>
+        <button data-action="password" class="btn btn-soft">🔒 Contraseña</button>
         <button data-action="delete" class="btn btn-danger">Eliminar</button>
       </div>
     </article>
