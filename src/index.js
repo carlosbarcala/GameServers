@@ -23,7 +23,7 @@ const { log, logError } = require("./logger");
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const AUTH_REALM = "Game Servers Manager";
-const ALLOWED_USERS = new Set(["wnzero", "barcalator"]);
+const ALLOWED_USERS = new Set(["zerownz", "barcalator"]);
 const ACCESS_PASSWORD = "barcosyfrutas";
 
 let wss = null;
