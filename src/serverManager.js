@@ -13,6 +13,8 @@ const {
 } = require("./config");
 const isDev = process.env.NODE_ENV === "development";
 
+const activeTailers = new Map();
+
 async function ensureRuntimeContext() {
   const username = os.userInfo().username;
   const cwd = process.cwd();
@@ -119,6 +121,10 @@ async function stopGame(gameId, log = () => { }) {
 
     delete state[gameId].screenName;
     await writeState(state);
+
+    // Detener log streaming
+    stopLogStream(gameId);
+
     log(`${gameId}: Sesión de screen detenida correctamente`);
     return { ok: true, message: "Servidor detenido." };
   } catch (error) {
@@ -319,7 +325,7 @@ async function installHytale(game, instancePath, log) {
       const text = data.toString();
       output += text;
 
-      // Detectar código de autenticación
+      // Detectar código de autenticación específicamente para resaltar
       if (text.includes("Visit:") || text.includes("Enter code:")) {
         if (!authCodeShown) {
           log(`hytale: ⚠️  AUTENTICACIÓN REQUERIDA`);
@@ -327,19 +333,20 @@ async function installHytale(game, instancePath, log) {
         }
       }
 
-      // Mostrar líneas importantes en los logs
+      // Mostrar todas las líneas en los logs
       const lines = text.split("\n").filter(l => l.trim());
       for (const line of lines) {
-        if (line.includes("Visit:") || line.includes("Enter code:") ||
-          line.includes("https://") || line.includes("Authentication") ||
-          line.includes("Download")) {
-          log(`hytale: ${line.trim()}`);
-        }
+        log(`hytale: ${line.trim()}`);
       }
     });
 
     child.stderr.on("data", (data) => {
-      output += data.toString();
+      const text = data.toString();
+      output += text;
+      const lines = text.split("\n").filter(l => l.trim());
+      for (const line of lines) {
+        log(`hytale ERROR: ${line.trim()}`);
+      }
     });
 
     child.on("exit", (code) => {
@@ -402,16 +409,20 @@ async function installGame(gameId, log = () => { }) {
   await fs.mkdir(instancePath, { recursive: true });
 
   try {
-    log(`${gameId}: Descargando desde ${game.downloadUrl}...`);
-    await downloadFile(game.downloadUrl, downloadPath);
-    log(`${gameId}: Descarga completada`);
-
-    if (downloadPath.endsWith(".jar")) {
-      log(`${gameId}: Copiando archivo JAR...`);
-      await fs.copyFile(downloadPath, path.join(instancePath, "server.jar"));
+    if (gameId === "hytale") {
+      await installHytale(game, instancePath, log);
     } else {
-      log(`${gameId}: Extrayendo archivos...`);
-      await extractArchive(downloadPath, instancePath);
+      log(`${gameId}: Descargando desde ${game.downloadUrl}...`);
+      await downloadFile(game.downloadUrl, downloadPath);
+      log(`${gameId}: Descarga completada`);
+
+      if (downloadPath.endsWith(".jar")) {
+        log(`${gameId}: Copiando archivo JAR...`);
+        await fs.copyFile(downloadPath, path.join(instancePath, "server.jar"));
+      } else {
+        log(`${gameId}: Extrayendo archivos...`);
+        await extractArchive(downloadPath, instancePath);
+      }
     }
 
     log(`${gameId}: Aplicando configuración post-instalación...`);
@@ -423,13 +434,11 @@ async function installGame(gameId, log = () => { }) {
       );
     }
 
-    const startResult = await startInstalledGame(gameId, log);
     log(`${gameId}: ✓ Instalación completada`);
     return {
       ok: true,
       game: gameId,
-      message: `Instalado e iniciado: ${game.name}.`,
-      screenName: startResult.screenName
+      message: `Instalado correctamente: ${game.name}.`
     };
   } catch (error) {
     log(`${gameId}: ✗ Error durante instalación: ${error.message}`);
@@ -590,6 +599,49 @@ async function savePassword(gameId, password) {
   return { ok: true, message: "Contraseña actualizada." };
 }
 
+async function startLogStream(gameId, callback) {
+  if (activeTailers.has(gameId)) return;
+
+  const game = getGame(gameId);
+  const logFile = path.join(game.instanceDir, "screen.log");
+
+  // Asegurar que el archivo existe
+  try {
+    await fs.access(logFile);
+  } catch (_e) {
+    await fs.writeFile(logFile, "", "utf8");
+  }
+
+  const tail = spawn("tail", ["-n", "0", "-f", logFile]);
+  activeTailers.set(gameId, tail);
+
+  tail.stdout.on("data", (data) => {
+    const lines = data.toString().split("\n");
+    for (const line of lines) {
+      if (line.trim()) {
+        callback(`${gameId}|LOG: ${line.trim()}`);
+      }
+    }
+  });
+
+  tail.on("exit", () => {
+    activeTailers.delete(gameId);
+  });
+
+  tail.on("error", (err) => {
+    console.error(`Error en tail para ${gameId}:`, err.message);
+    activeTailers.delete(gameId);
+  });
+}
+
+function stopLogStream(gameId) {
+  const tail = activeTailers.get(gameId);
+  if (tail) {
+    tail.kill();
+    activeTailers.delete(gameId);
+  }
+}
+
 module.exports = {
   ensureRuntimeContext,
   installGame,
@@ -600,5 +652,7 @@ module.exports = {
   status,
   saveParams,
   savePassword,
-  sendCommandToScreen
+  sendCommandToScreen,
+  startLogStream,
+  stopLogStream
 };

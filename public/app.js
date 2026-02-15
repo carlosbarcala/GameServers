@@ -44,12 +44,19 @@ function connectWebSocket() {
 
 function pushLog(message) {
   const ts = new Date().toLocaleTimeString();
-  logBoxEl.textContent += `[${ts}] ${message}\n`;
+
+  // Limpiar formato especial si viene de log streaming
+  let displayMessage = message;
+  if (message.includes("|LOG: ")) {
+    displayMessage = message.replace("|LOG: ", " > ");
+  }
+
+  logBoxEl.textContent += `[${ts}] ${displayMessage}\n`;
 
   // Limitar a ~6000 caracteres (eliminar líneas antiguas del inicio)
-  if (logBoxEl.textContent.length > 6000) {
+  if (logBoxEl.textContent.length > 8000) {
     const lines = logBoxEl.textContent.split("\n");
-    logBoxEl.textContent = lines.slice(-100).join("\n");
+    logBoxEl.textContent = lines.slice(-200).join("\n");
   }
 
   // Auto-scroll al final
@@ -204,6 +211,27 @@ function renderCards(data) {
       consoleBtn.addEventListener("click", sendCmd);
       consoleInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") sendCmd();
+      });
+
+      // Configurar chat
+      const chatInput = node.querySelector(".chat-input");
+      const chatBtn = node.querySelector(".btn-chat-send");
+
+      const sendChat = async () => {
+        const message = chatInput.value.trim();
+        if (!message) return;
+        try {
+          await request(`/games/${gameId}/chat`, "POST", { message });
+          chatInput.value = "";
+          pushLog(`${gameId} [CHAT]: ${message}`);
+        } catch (error) {
+          pushLog(`${gameId}: error al enviar mensaje - ${error.message}`);
+        }
+      };
+
+      chatBtn.addEventListener("click", sendChat);
+      chatInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendChat();
       });
     }
 

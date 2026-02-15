@@ -14,7 +14,9 @@ const {
   status,
   saveParams,
   savePassword,
-  sendCommandToScreen
+  sendCommandToScreen,
+  startLogStream,
+  stopLogStream
 } = require("./serverManager");
 const { log, logError } = require("./logger");
 
@@ -220,11 +222,13 @@ async function handleRequest(req, res) {
 
       if (parts[2] === "restart" && req.method === "POST") {
         const result = await restartGame(gameId, broadcast);
+        startLogStream(gameId, broadcast).catch(err => logError(`Error log stream: ${err.message}`));
         return sendJson(res, 200, result);
       }
 
       if (parts[2] === "start" && req.method === "POST") {
         const result = await startInstalledGame(gameId, broadcast);
+        startLogStream(gameId, broadcast).catch(err => logError(`Error log stream: ${err.message}`));
         return sendJson(res, 200, result);
       }
 
@@ -259,6 +263,27 @@ async function handleRequest(req, res) {
         broadcast(`${gameId}: comando enviado -> ${body.command}`);
         return sendJson(res, 200, { ok: true, message: "Comando enviado." });
       }
+
+      if (parts[2] === "chat" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        const gameStatus = await status();
+        const screenName = gameStatus[gameId]?.screenName;
+
+        if (!screenName) {
+          throw new Error("El servidor no está en ejecución.");
+        }
+
+        let cmd = "";
+        if (gameId === "hytale") {
+          cmd = `broadcast ${body.message}`;
+        } else {
+          cmd = `say ${body.message}`;
+        }
+
+        await sendCommandToScreen(screenName, cmd);
+        broadcast(`${gameId} [CHAT]: ${body.message}`);
+        return sendJson(res, 200, { ok: true, message: "Mensaje enviado." });
+      }
     }
 
     if (req.method === "GET") {
@@ -283,6 +308,16 @@ async function handleRequest(req, res) {
 
 async function bootstrap() {
   await ensureRuntimeContext();
+
+  // Iniciar log streaming para juegos que ya estén corriendo
+  const currentStatus = await status();
+  for (const [gameId, info] of Object.entries(currentStatus)) {
+    if (info.running) {
+      startLogStream(gameId, broadcast).catch(err => {
+        logError(`Error iniciando log stream para ${gameId} en bootstrap`, err);
+      });
+    }
+  }
 
   const server = http.createServer((req, res) => {
     handleRequest(req, res).catch((error) => {
