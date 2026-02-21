@@ -328,6 +328,72 @@ h1 {
   color: #b8c9dc;
 }
 
+/* ── Asistente box ───────────────────────────────────────────────────────── */
+
+.ai-box {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  border-radius: 1rem;
+  padding: 0.85rem 1.1rem;
+  backdrop-filter: blur(8px);
+  animation: riseIn 570ms ease;
+}
+
+/* ── AI prompt modal ─────────────────────────────────────────────────────── */
+
+.ai-modal {
+  width: min(640px, 92vw);
+  border: 1px solid rgba(134, 174, 207, 0.35);
+  background: #0d1824;
+  border-radius: 1rem;
+  padding: 1.25rem 1.3rem;
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+.ai-modal::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+.ai-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.ai-modal-close {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.ai-modal-textarea {
+  width: 100%;
+  background: rgba(10, 20, 30, 0.7);
+  border: 1px solid rgba(134, 174, 207, 0.25);
+  border-radius: 0.65rem;
+  color: var(--text);
+  font: 0.82rem/1.45 "IBM Plex Mono", monospace;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.ai-modal-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ai-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 @keyframes riseIn {
   from {
     opacity: 0;

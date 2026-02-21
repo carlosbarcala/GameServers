@@ -30,6 +30,23 @@
 
     <section id="cards" class="cards" aria-live="polite"></section>
 
+    <section class="ai-box">
+      <span class="terminal-title">Asistente</span>
+      <button id="aiPromptToggleBtn" class="btn btn-soft">Editar</button>
+    </section>
+
+    <dialog id="aiPromptModal" class="ai-modal">
+      <div class="ai-modal-header">
+        <span class="terminal-title">Asistente God &mdash; Prompt del sistema</span>
+        <button id="aiPromptCloseBtn" class="btn btn-soft ai-modal-close">✕</button>
+      </div>
+      <textarea id="aiPromptTextarea" class="ai-modal-textarea" rows="14"></textarea>
+      <div class="ai-modal-actions">
+        <button id="aiPromptSaveBtn" class="btn btn-primary">Guardar</button>
+        <button id="aiPromptResetBtn" class="btn btn-soft">Restaurar por defecto</button>
+      </div>
+    </dialog>
+
     <section class="terminal">
       <div class="terminal-title">Actividad</div>
       <pre id="logBox"></pre>

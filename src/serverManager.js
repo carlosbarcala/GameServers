@@ -611,6 +611,19 @@ async function saveAIConfig(config) {
   return { ok: true, message: "Configuración AI guardada." };
 }
 
+async function getAISystemPrompt() {
+  const state = await readState();
+  return state._ai?.systemPrompt || null;
+}
+
+async function saveAISystemPrompt(prompt) {
+  const state = await readState();
+  if (!state._ai) state._ai = {};
+  state._ai.systemPrompt = prompt;
+  await writeState(state);
+  return { ok: true, message: "Prompt del asistente guardado." };
+}
+
 async function startLogStream(gameId, callback, lineCallback = null) {
   if (activeTailers.has(gameId)) return;
 
@@ -669,5 +682,7 @@ module.exports = {
   startLogStream,
   stopLogStream,
   getAIConfig,
-  saveAIConfig
+  saveAIConfig,
+  getAISystemPrompt,
+  saveAISystemPrompt
 };

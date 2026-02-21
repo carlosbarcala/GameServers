@@ -17,7 +17,9 @@ const {
   sendCommandToScreen,
   startLogStream,
   getAIConfig,
-  saveAIConfig
+  saveAIConfig,
+  getAISystemPrompt,
+  saveAISystemPrompt
 } = require("./serverManager");
 const { log, logError } = require("./logger");
 const chatAssistant = require("./services/ai/ChatAssistant");
@@ -87,6 +89,11 @@ async function initChatAssistant() {
   chatAssistant.configure(aiConfig);
   chatAssistant.logFn = broadcast;
   chatAssistant.sendChatFn = buildSendChatFn();
+
+  // Cargar prompt personalizado si existe
+  const savedPrompt = await getAISystemPrompt();
+  if (savedPrompt) chatAssistant.setSystemPrompt(savedPrompt);
+
   log(`AI: Asistente "God" activo (${chatAssistant.provider})`);
 }
 
@@ -318,6 +325,36 @@ async function handleRequest(req, res) {
           message: `Asistente AI configurado con ${body.provider}.`,
           enabled: chatAssistant.isEnabled()
         });
+      }
+    }
+
+    // ── Endpoints de prompt del asistente AI ─────────────────────────────
+    if (parts.length === 2 && parts[0] === "ai" && parts[1] === "prompt") {
+      if (req.method === "GET") {
+        const savedPrompt = await getAISystemPrompt();
+        return sendJson(res, 200, {
+          ok: true,
+          data: {
+            prompt: savedPrompt || chatAssistant.getDefaultSystemPrompt(),
+            isDefault: !savedPrompt
+          }
+        });
+      }
+
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        const prompt = body.prompt?.trim() || "";
+        if (prompt) {
+          await saveAISystemPrompt(prompt);
+          chatAssistant.setSystemPrompt(prompt);
+          log("AI: Prompt del asistente actualizado");
+        } else {
+          // Prompt vacío = restaurar default
+          await saveAISystemPrompt(null);
+          chatAssistant.setSystemPrompt(null);
+          log("AI: Prompt del asistente restaurado al default");
+        }
+        return sendJson(res, 200, { ok: true, message: "Prompt actualizado." });
       }
     }
 

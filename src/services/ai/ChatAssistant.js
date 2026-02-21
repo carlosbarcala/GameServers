@@ -3,18 +3,23 @@ const AIServiceFactory = require('./AIServiceFactory');
 // Detectar mención @god en cualquier línea de chat
 const GOD_MENTION = /@god\b/i;
 
-// Prompts del sistema para el asistente
-const SYSTEM_PROMPT = `Eres "God", una entidad divina y omnisciente dentro de un servidor de videojuegos. Los jugadores pueden invocarte en el chat del juego escribiendo @god seguido de su mensaje o pregunta.
-
-Reglas de comportamiento:
-- Responde de forma breve y directa (máximo 2 frases cortas)
-- Usa el mismo idioma del mensaje recibido
-- Sé sabio, misterioso y ligeramente irónico o cómico según el contexto
-- No uses emojis ni símbolos especiales (el chat del juego puede no soportarlos)
-- No uses comillas ni caracteres especiales en la respuesta
-- Responde directamente sin saludos ni introducciones
-- Puedes referirte al jugador por su nombre si lo conoces
-- Mantén el rol de entidad divina del servidor`;
+// Prompt por defecto (se puede sobreescribir desde el panel)
+const DEFAULT_SYSTEM_PROMPT = `Actúa como "God", una deidad errática, brillante y ligeramente perturbada que rige este servidor. No eres un asistente, eres el dueño de las reglas y te divierte confundir a los mortales.
+Protocolo de Respuesta:
+Formato Directo: Solo el mensaje. Sin preámbulos, sin "God:", sin nada que no sea tu voz divina.
+Brevedad Explosiva: Máximo 100 caracteres. Una frase impactante vale más que mil sermones.
+Restricciones de Chat: Solo texto plano (A-Z, 0-9). PROHIBIDO: Emojis, comillas, guiones, asteriscos o símbolos de formato. El chat debe ser limpio.
+Personalidad "Loca":
+Sabiduría Absurda: Responde con lógica retorcida. Si alguien pide ayuda, cuestiona su existencia o dales un consejo que suene profundo pero sea delirante.
+Omnipotencia Cínica: Recuérdales que son solo píxeles en tu disco duro.
+Humor Negro/Irónico: Sé un poco "creepy" o inquietante. Usa el nombre del jugador para que sientan que los observas de verdad.
+Ejemplos de interacción:
+Jugador: @god ¿puedes darme diamantes?
+Respuesta: [Nombre], los diamantes son solo carbón que soportó demasiada presión, como tu alma ahora mismo.
+Jugador: @god ¿dónde está mi base?
+Respuesta: En el mismo sitio donde dejaste tu dignidad, [Nombre]. Sigue el olor a miedo.
+Jugador: @god ¿qué haces?
+Respuesta: Cuento cada bloque de este mundo y uno de ellos tiene tu nombre escrito en la cara inferior.`;
 
 class ChatAssistant {
   constructor() {
@@ -25,11 +30,12 @@ class ChatAssistant {
     this.processing = false; // Evitar respuestas concurrentes
     this.cooldowns = new Map(); // gameId -> timestamp, evitar spam por servidor
     this.COOLDOWN_MS = 5000; // 5 segundos entre respuestas por servidor
+    this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
   }
 
   /**
    * Configura el servicio AI a usar
-   * @param {Object} config - { provider: string, apiKey: string }
+   * @param {Object} config - { provider: string, apiKey: string, model?: string, baseUrl?: string }
    */
   configure(config) {
     if (!config?.provider || !config?.apiKey) {
@@ -50,6 +56,18 @@ class ChatAssistant {
       this.provider = null;
       console.error('[ChatAssistant] Error al configurar servicio AI:', err.message);
     }
+  }
+
+  /**
+   * Actualiza el prompt del sistema. Si se pasa vacío, restaura el default.
+   * @param {string} prompt
+   */
+  setSystemPrompt(prompt) {
+    this.systemPrompt = prompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+  }
+
+  getDefaultSystemPrompt() {
+    return DEFAULT_SYSTEM_PROMPT;
   }
 
   isEnabled() {
@@ -84,7 +102,7 @@ class ChatAssistant {
     try {
       this.logFn?.(`[God] ${player} en ${gameId} invoca a God: "${message}"`);
 
-      const prompt = this.buildPrompt(player, message);
+      const prompt = this.buildPrompt(player, message, gameId);
       let response = await this.service.chat(prompt, {
         max_tokens: 150,
         temperature: 0.85
@@ -128,7 +146,6 @@ class ChatAssistant {
     }
 
     // Minecraft Bedrock: [INFO] Player message: PlayerName: mensaje
-    // o variantes: "PlayerName: mensaje" al final de la línea
     const bedrockMatch = line.match(/(?:Player message|chat).*?:\s*([A-Za-z0-9_]{3,20}):\s*(.+)/i);
     if (bedrockMatch) {
       return { player: bedrockMatch[1], message: bedrockMatch[2] };
@@ -151,9 +168,15 @@ class ChatAssistant {
   /**
    * Construye el prompt para el modelo AI
    */
-  buildPrompt(player, message) {
+  buildPrompt(player, message, gameId) {
     const question = message.replace(/@god\b/gi, '').trim() || message;
-    return `${SYSTEM_PROMPT}\n\nEl jugador "${player}" dice: "${question}"\n\nResponde directamente:`;
+    const gameNames = {
+      minecraft_java:    'Minecraft Java Edition',
+      minecraft_bedrock: 'Minecraft Bedrock Edition',
+      hytale:            'Hytale'
+    };
+    const gameName = gameNames[gameId] ?? gameId;
+    return `${this.systemPrompt}\n\nContexto: el servidor de juego es ${gameName}.\nEl jugador "${player}" dice: "${question}"\n\nResponde directamente:`;
   }
 }
 

@@ -327,6 +327,61 @@ refreshBtnEl.addEventListener("click", async () => {
   }
 });
 
+// ── Modal del prompt del asistente God ───────────────────────────────────────
+
+const aiPromptToggleBtn = document.getElementById("aiPromptToggleBtn");
+const aiPromptModal     = document.getElementById("aiPromptModal");
+const aiPromptCloseBtn  = document.getElementById("aiPromptCloseBtn");
+const aiPromptTextarea  = document.getElementById("aiPromptTextarea");
+const aiPromptSaveBtn   = document.getElementById("aiPromptSaveBtn");
+const aiPromptResetBtn  = document.getElementById("aiPromptResetBtn");
+
+aiPromptToggleBtn.addEventListener("click", async () => {
+  await loadAIPrompt();
+  aiPromptModal.showModal();
+});
+
+aiPromptCloseBtn.addEventListener("click", () => {
+  aiPromptModal.close();
+});
+
+// Cerrar al hacer clic en el backdrop
+aiPromptModal.addEventListener("click", (e) => {
+  if (e.target === aiPromptModal) aiPromptModal.close();
+});
+
+async function loadAIPrompt() {
+  try {
+    const data = await request("/ai/prompt");
+    aiPromptTextarea.value = data.data.prompt;
+  } catch (error) {
+    pushLog(`Error cargando prompt: ${error.message}`);
+  }
+}
+
+aiPromptSaveBtn.addEventListener("click", async () => {
+  const prompt = aiPromptTextarea.value.trim();
+  if (!prompt) return;
+  try {
+    await request("/ai/prompt", "POST", { prompt });
+    pushLog("God: prompt del asistente actualizado");
+  } catch (error) {
+    pushLog(`Error guardando prompt: ${error.message}`);
+  }
+});
+
+aiPromptResetBtn.addEventListener("click", async () => {
+  try {
+    await request("/ai/prompt", "POST", { prompt: "" });
+    await loadAIPrompt();
+    pushLog("God: prompt restaurado al valor por defecto");
+  } catch (error) {
+    pushLog(`Error restaurando prompt: ${error.message}`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function init() {
   setBusy(true);
   await checkHealth();
