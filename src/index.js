@@ -16,15 +16,79 @@ const {
   savePassword,
   sendCommandToScreen,
   startLogStream,
-  stopLogStream
+  getAIConfig,
+  saveAIConfig
 } = require("./serverManager");
 const { log, logError } = require("./logger");
+const chatAssistant = require("./services/ai/ChatAssistant");
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const AUTH_REALM = "Game Servers Manager";
 const ALLOWED_USERS = new Set(["zerownz", "barcalator"]);
 const ACCESS_PASSWORD = "barcosyfrutas";
+
+// Carga variables del archivo .env sin dependencias externas.
+// Las variables del .env siempre sobreescriben las del entorno del proceso.
+async function loadEnv() {
+  const envPath = path.join(__dirname, "..", ".env");
+  try {
+    const content = await fs.readFile(envPath, "utf8");
+    let loaded = 0;
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+      if (key) {
+        process.env[key] = value;
+        loaded++;
+      }
+    }
+    console.log(`[ENV] .env cargado desde ${envPath} (${loaded} variables)`);
+  } catch (err) {
+    console.log(`[ENV] Sin archivo .env (${envPath}): ${err.message}`);
+  }
+}
+
+// Función que envía un mensaje al chat del juego como "God"
+function buildSendChatFn() {
+  return async (gameId, message) => {
+    const gameStatus = await status();
+    const screenName = gameStatus[gameId]?.screenName;
+    if (!screenName) return;
+    const cmd = gameId === "hytale" ? `broadcast [God] ${message}` : `say [God] ${message}`;
+    await sendCommandToScreen(screenName, cmd);
+    broadcast(`${gameId} [God]: ${message}`);
+  };
+}
+
+// Configura el asistente de chat con la config almacenada o las vars de entorno.
+// Las variables de .env siempre sobreescriben los campos del estado guardado.
+async function initChatAssistant() {
+  const aiConfig = await getAIConfig() || {};
+
+  // .env tiene prioridad: sobreescribe campo a campo lo que esté definido
+  if (process.env.AI_PROVIDER)  aiConfig.provider = process.env.AI_PROVIDER;
+  if (process.env.AI_API_KEY)   aiConfig.apiKey   = process.env.AI_API_KEY;
+  if (process.env.AI_MODEL)     aiConfig.model    = process.env.AI_MODEL;
+  if (process.env.AI_BASE_URL)  aiConfig.baseUrl  = process.env.AI_BASE_URL;
+
+  if (!aiConfig.provider || !aiConfig.apiKey) {
+    log("AI: Asistente desactivado (sin configuración de API)");
+    return;
+  }
+
+  await saveAIConfig(aiConfig);
+  log(`AI: Configuración — proveedor: ${aiConfig.provider}, modelo: ${aiConfig.model ?? "default"}${aiConfig.baseUrl ? `, url: ${aiConfig.baseUrl}` : ""}`);
+
+  chatAssistant.configure(aiConfig);
+  chatAssistant.logFn = broadcast;
+  chatAssistant.sendChatFn = buildSendChatFn();
+  log(`AI: Asistente "God" activo (${chatAssistant.provider})`);
+}
 
 let wss = null;
 const wsClients = new Set();
@@ -217,18 +281,60 @@ async function handleRequest(req, res) {
       }
     }
 
+    // ── Endpoints de configuración del asistente AI ──────────────────────
+    if (parts.length === 1 && parts[0] === "ai") {
+      if (req.method === "GET") {
+        const aiConfig = await getAIConfig();
+        return sendJson(res, 200, {
+          ok: true,
+          data: {
+            provider: aiConfig?.provider || null,
+            model: aiConfig?.model || null,
+            baseUrl: aiConfig?.baseUrl || null,
+            hasApiKey: !!aiConfig?.apiKey,
+            enabled: chatAssistant.isEnabled()
+          }
+        });
+      }
+
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        if (!body.provider || !body.apiKey) {
+          return sendJson(res, 400, { ok: false, error: "Se requieren provider y apiKey." });
+        }
+        const aiConfig = {
+          provider: body.provider,
+          apiKey: body.apiKey,
+          ...(body.model   ? { model:   body.model   } : {}),
+          ...(body.baseUrl ? { baseUrl: body.baseUrl } : {})
+        };
+        await saveAIConfig(aiConfig);
+        chatAssistant.configure(aiConfig);
+        chatAssistant.logFn = broadcast;
+        chatAssistant.sendChatFn = buildSendChatFn();
+        log(`AI: Asistente reconfigurado — proveedor: "${body.provider}", modelo: "${body.model ?? "default"}"${body.baseUrl ? `, url: ${body.baseUrl}` : ""}`);
+        return sendJson(res, 200, {
+          ok: true,
+          message: `Asistente AI configurado con ${body.provider}.`,
+          enabled: chatAssistant.isEnabled()
+        });
+      }
+    }
+
     if (parts.length === 3 && parts[0] === "games") {
       const gameId = normalizeGameId(parts[1]);
 
       if (parts[2] === "restart" && req.method === "POST") {
         const result = await restartGame(gameId, broadcast);
-        startLogStream(gameId, broadcast).catch(err => logError(`Error log stream: ${err.message}`));
+        startLogStream(gameId, broadcast, (gid, line) => chatAssistant.processLine(gid, line))
+          .catch(err => logError(`Error log stream: ${err.message}`));
         return sendJson(res, 200, result);
       }
 
       if (parts[2] === "start" && req.method === "POST") {
         const result = await startInstalledGame(gameId, broadcast);
-        startLogStream(gameId, broadcast).catch(err => logError(`Error log stream: ${err.message}`));
+        startLogStream(gameId, broadcast, (gid, line) => chatAssistant.processLine(gid, line))
+          .catch(err => logError(`Error log stream: ${err.message}`));
         return sendJson(res, 200, result);
       }
 
@@ -307,15 +413,18 @@ async function handleRequest(req, res) {
 }
 
 async function bootstrap() {
+  await loadEnv();
   await ensureRuntimeContext();
+  await initChatAssistant();
 
   // Iniciar log streaming para juegos que ya estén corriendo
   const currentStatus = await status();
   for (const [gameId, info] of Object.entries(currentStatus)) {
     if (info.running) {
-      startLogStream(gameId, broadcast).catch(err => {
-        logError(`Error iniciando log stream para ${gameId} en bootstrap`, err);
-      });
+      startLogStream(gameId, broadcast, (gid, line) => chatAssistant.processLine(gid, line))
+        .catch(err => {
+          logError(`Error iniciando log stream para ${gameId} en bootstrap`, err);
+        });
     }
   }
 

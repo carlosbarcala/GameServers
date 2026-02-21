@@ -246,8 +246,8 @@ function renderCards(data) {
         // NO INSTALADO: solo mostrar "Instalar"
         shouldShow = action === "install";
       } else if (game.running) {
-        // ACTIVO: mostrar "Parar", "Reiniciar", "Eliminar", "Contraseña"
-        shouldShow = action === "stop" || action === "restart" || action === "delete" || action === "password";
+        // ACTIVO: mostrar "Parar", "Reiniciar", "Contraseña"
+        shouldShow = action === "stop" || action === "restart" || action === "password";
       } else {
         // INSTALADO (parado): mostrar "Iniciar", "Eliminar", "Contraseña"
         shouldShow = action === "start" || action === "delete" || action === "password";

@@ -599,7 +599,19 @@ async function savePassword(gameId, password) {
   return { ok: true, message: "Contraseña actualizada." };
 }
 
-async function startLogStream(gameId, callback) {
+async function getAIConfig() {
+  const state = await readState();
+  return state._ai || null;
+}
+
+async function saveAIConfig(config) {
+  const state = await readState();
+  state._ai = config;
+  await writeState(state);
+  return { ok: true, message: "Configuración AI guardada." };
+}
+
+async function startLogStream(gameId, callback, lineCallback = null) {
   if (activeTailers.has(gameId)) return;
 
   const game = getGame(gameId);
@@ -620,6 +632,7 @@ async function startLogStream(gameId, callback) {
     for (const line of lines) {
       if (line.trim()) {
         callback(`${gameId}|LOG: ${line.trim()}`);
+        if (lineCallback) lineCallback(gameId, line.trim());
       }
     }
   });
@@ -654,5 +667,7 @@ module.exports = {
   savePassword,
   sendCommandToScreen,
   startLogStream,
-  stopLogStream
+  stopLogStream,
+  getAIConfig,
+  saveAIConfig
 };
