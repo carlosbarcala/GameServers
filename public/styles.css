@@ -380,6 +380,51 @@ h1 {
   font-size: 0.85rem;
 }
 
+.ai-prompt-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.ai-tab-btn {
+  background: transparent;
+  border: 1px solid rgba(134, 174, 207, 0.2);
+  border-radius: 0.45rem;
+  color: var(--text-muted, #6b8a9e);
+  cursor: pointer;
+  font: 0.78rem/1 "IBM Plex Mono", monospace;
+  padding: 0.35rem 0.9rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ai-tab-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ai-tab-btn.active {
+  background: rgba(134, 174, 207, 0.15);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ai-tab-panel {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ai-tab-panel.active {
+  display: flex;
+}
+
+.ai-tab-hint {
+  color: var(--text-muted, #6b8a9e);
+  font-size: 0.75rem;
+  margin: 0 0 0.5rem;
+}
+
 .ai-modal-textarea {
   flex: 1;
   width: 100%;

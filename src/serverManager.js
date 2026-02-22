@@ -179,7 +179,8 @@ async function extractArchive(archivePath, targetDir) {
 
 function runCommand(bin, args, cwd) {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { cwd, stdio: "ignore" });
+    const child = spawn(bin, args, { cwd, stdio: "ignore", detached: true });
+    child.unref();
     child.on("exit", (code) => {
       if (code === 0) {
         resolve();
@@ -624,6 +625,24 @@ async function saveAISystemPrompt(prompt) {
   return { ok: true, message: "Prompt del asistente guardado." };
 }
 
+async function getAIGamePrompt(gameId) {
+  const state = await readState();
+  return state._ai?.gamePrompts?.[gameId] || null;
+}
+
+async function saveAIGamePrompt(gameId, prompt) {
+  const state = await readState();
+  if (!state._ai) state._ai = {};
+  if (!state._ai.gamePrompts) state._ai.gamePrompts = {};
+  if (prompt) {
+    state._ai.gamePrompts[gameId] = prompt;
+  } else {
+    delete state._ai.gamePrompts[gameId];
+  }
+  await writeState(state);
+  return { ok: true, message: "Prompt de juego guardado." };
+}
+
 async function startLogStream(gameId, callback, lineCallback = null) {
   if (activeTailers.has(gameId)) return;
 
@@ -684,5 +703,7 @@ module.exports = {
   getAIConfig,
   saveAIConfig,
   getAISystemPrompt,
-  saveAISystemPrompt
+  saveAISystemPrompt,
+  getAIGamePrompt,
+  saveAIGamePrompt
 };

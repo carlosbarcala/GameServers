@@ -37,13 +37,37 @@
 
     <dialog id="aiPromptModal" class="ai-modal">
       <div class="ai-modal-header">
-        <span class="terminal-title">Asistente God &mdash; Prompt del sistema</span>
+        <span class="terminal-title">Asistente God &mdash; Prompts del sistema</span>
         <button id="aiPromptCloseBtn" class="btn btn-soft ai-modal-close">✕</button>
       </div>
-      <textarea id="aiPromptTextarea" class="ai-modal-textarea" rows="14"></textarea>
-      <div class="ai-modal-actions">
-        <button id="aiPromptSaveBtn" class="btn btn-primary">Guardar</button>
-        <button id="aiPromptResetBtn" class="btn btn-soft">Restaurar por defecto</button>
+      <div class="ai-prompt-tabs">
+        <button class="ai-tab-btn active" data-tab="general">General</button>
+        <button class="ai-tab-btn" data-tab="minecraft">Minecraft</button>
+        <button class="ai-tab-btn" data-tab="hytale">Hytale</button>
+      </div>
+      <div class="ai-tab-panel active" data-panel="general">
+        <p class="ai-tab-hint">Prompt base usado cuando no hay uno específico para el juego.</p>
+        <textarea id="aiPromptTextarea" class="ai-modal-textarea"></textarea>
+        <div class="ai-modal-actions">
+          <button class="btn btn-primary ai-save-btn" data-target="general">Guardar</button>
+          <button class="btn btn-soft ai-reset-btn" data-target="general">Restaurar por defecto</button>
+        </div>
+      </div>
+      <div class="ai-tab-panel" data-panel="minecraft">
+        <p class="ai-tab-hint">Sobreescribe el prompt general para servidores Minecraft (Java y Bedrock). Maximo 100 caracteres en respuesta.</p>
+        <textarea id="aiPromptMinecraft" class="ai-modal-textarea"></textarea>
+        <div class="ai-modal-actions">
+          <button class="btn btn-primary ai-save-btn" data-target="minecraft">Guardar</button>
+          <button class="btn btn-soft ai-reset-btn" data-target="minecraft">Usar prompt general</button>
+        </div>
+      </div>
+      <div class="ai-tab-panel" data-panel="hytale">
+        <p class="ai-tab-hint">Sobreescribe el prompt general para servidores Hytale. Maximo 200 caracteres en respuesta.</p>
+        <textarea id="aiPromptHytale" class="ai-modal-textarea"></textarea>
+        <div class="ai-modal-actions">
+          <button class="btn btn-primary ai-save-btn" data-target="hytale">Guardar</button>
+          <button class="btn btn-soft ai-reset-btn" data-target="hytale">Usar prompt general</button>
+        </div>
       </div>
     </dialog>
 

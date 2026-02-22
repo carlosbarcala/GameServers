@@ -332,52 +332,80 @@ refreshBtnEl.addEventListener("click", async () => {
 const aiPromptToggleBtn = document.getElementById("aiPromptToggleBtn");
 const aiPromptModal     = document.getElementById("aiPromptModal");
 const aiPromptCloseBtn  = document.getElementById("aiPromptCloseBtn");
-const aiPromptTextarea  = document.getElementById("aiPromptTextarea");
-const aiPromptSaveBtn   = document.getElementById("aiPromptSaveBtn");
-const aiPromptResetBtn  = document.getElementById("aiPromptResetBtn");
 
+// Textareas por pestaña
+const aiPromptTextareas = {
+  general:   document.getElementById("aiPromptTextarea"),
+  minecraft: document.getElementById("aiPromptMinecraft"),
+  hytale:    document.getElementById("aiPromptHytale"),
+};
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".ai-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".ai-tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".ai-tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelector(`.ai-tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add("active");
+  });
+});
+
+// ── Abrir / cerrar modal ──────────────────────────────────────────────────────
 aiPromptToggleBtn.addEventListener("click", async () => {
-  await loadAIPrompt();
+  await loadAllPrompts();
   aiPromptModal.showModal();
 });
 
-aiPromptCloseBtn.addEventListener("click", () => {
-  aiPromptModal.close();
-});
+aiPromptCloseBtn.addEventListener("click", () => aiPromptModal.close());
 
-// Cerrar al hacer clic en el backdrop
 aiPromptModal.addEventListener("click", (e) => {
   if (e.target === aiPromptModal) aiPromptModal.close();
 });
 
-async function loadAIPrompt() {
+// ── Carga de prompts ──────────────────────────────────────────────────────────
+async function loadAllPrompts() {
   try {
-    const data = await request("/ai/prompt");
-    aiPromptTextarea.value = data.data.prompt;
+    const [general, minecraft, hytale] = await Promise.all([
+      request("/ai/prompt"),
+      request("/ai/prompt/minecraft"),
+      request("/ai/prompt/hytale"),
+    ]);
+    aiPromptTextareas.general.value   = general.data.prompt;
+    aiPromptTextareas.minecraft.value = minecraft.data.prompt;
+    aiPromptTextareas.hytale.value    = hytale.data.prompt;
   } catch (error) {
-    pushLog(`Error cargando prompt: ${error.message}`);
+    pushLog(`Error cargando prompts: ${error.message}`);
   }
 }
 
-aiPromptSaveBtn.addEventListener("click", async () => {
-  const prompt = aiPromptTextarea.value.trim();
-  if (!prompt) return;
-  try {
-    await request("/ai/prompt", "POST", { prompt });
-    pushLog("God: prompt del asistente actualizado");
-  } catch (error) {
-    pushLog(`Error guardando prompt: ${error.message}`);
-  }
+// ── Guardar / restaurar por botón ─────────────────────────────────────────────
+document.querySelectorAll(".ai-save-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const target = btn.dataset.target;
+    const prompt = aiPromptTextareas[target].value.trim();
+    if (!prompt) return;
+    try {
+      const url = target === "general" ? "/ai/prompt" : `/ai/prompt/${target}`;
+      await request(url, "POST", { prompt });
+      pushLog(`God: prompt de ${target} actualizado`);
+    } catch (error) {
+      pushLog(`Error guardando prompt: ${error.message}`);
+    }
+  });
 });
 
-aiPromptResetBtn.addEventListener("click", async () => {
-  try {
-    await request("/ai/prompt", "POST", { prompt: "" });
-    await loadAIPrompt();
-    pushLog("God: prompt restaurado al valor por defecto");
-  } catch (error) {
-    pushLog(`Error restaurando prompt: ${error.message}`);
-  }
+document.querySelectorAll(".ai-reset-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const target = btn.dataset.target;
+    try {
+      const url = target === "general" ? "/ai/prompt" : `/ai/prompt/${target}`;
+      await request(url, "POST", { prompt: "" });
+      await loadAllPrompts();
+      pushLog(`God: prompt de ${target} restaurado`);
+    } catch (error) {
+      pushLog(`Error restaurando prompt: ${error.message}`);
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

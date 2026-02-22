@@ -3,6 +3,24 @@ const AIServiceFactory = require('./AIServiceFactory');
 // Detectar mención @god en cualquier línea de chat
 const GOD_MENTION = /@god\b/i;
 
+// Límites de caracteres por tipo de juego
+const GAME_CHAR_LIMITS = {
+  minecraft_java:    100,
+  minecraft_bedrock: 100,
+  hytale:            200,
+};
+
+/**
+ * Elimina caracteres especiales que pueden romper los comandos del juego
+ * o causar problemas en el chat (corchetes, llaves, comillas, etc.)
+ */
+function sanitizeMessage(text) {
+  return text
+    .replace(/[\[\]{}<>()"'`\\|^~@#$%&*_=+]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Prompt por defecto (se puede sobreescribir desde el panel)
 const DEFAULT_SYSTEM_PROMPT = `Actúa como "God", una deidad errática, brillante y ligeramente perturbada que rige este servidor. No eres un asistente, eres el dueño de las reglas y te divierte confundir a los mortales.
 Protocolo de Respuesta:
@@ -31,6 +49,7 @@ class ChatAssistant {
     this.cooldowns = new Map(); // gameId -> timestamp, evitar spam por servidor
     this.COOLDOWN_MS = 5000; // 5 segundos entre respuestas por servidor
     this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    this.gamePrompts = {}; // { minecraft: '...', hytale: '...' }
   }
 
   /**
@@ -68,6 +87,25 @@ class ChatAssistant {
 
   getDefaultSystemPrompt() {
     return DEFAULT_SYSTEM_PROMPT;
+  }
+
+  /**
+   * Establece el prompt específico para un juego.
+   * gameId puede ser 'minecraft' (cubre java y bedrock) o 'hytale'.
+   * Si prompt está vacío, elimina el override para ese juego.
+   */
+  setGamePrompt(gameId, prompt) {
+    const key = gameId.startsWith('minecraft') ? 'minecraft' : gameId;
+    if (prompt?.trim()) {
+      this.gamePrompts[key] = prompt.trim();
+    } else {
+      delete this.gamePrompts[key];
+    }
+  }
+
+  getGamePrompt(gameId) {
+    const key = gameId.startsWith('minecraft') ? 'minecraft' : gameId;
+    return this.gamePrompts[key] || null;
   }
 
   isEnabled() {
@@ -108,16 +146,17 @@ class ChatAssistant {
         temperature: 0.85
       });
 
-      // Limpiar respuesta: quitar comillas envolventes, saltos de línea
+      // Limpiar respuesta: saltos de línea, caracteres especiales
       response = response
         .trim()
-        .replace(/^["'`]|["'`]$/g, '')
         .replace(/\n+/g, ' ')
         .trim();
+      response = sanitizeMessage(response);
 
-      // Truncar si es demasiado larga (límite del chat de juego)
-      if (response.length > 220) {
-        response = response.slice(0, 217) + '...';
+      // Truncar según el límite del juego
+      const limit = GAME_CHAR_LIMITS[gameId] ?? 200;
+      if (response.length > limit) {
+        response = response.slice(0, limit - 3) + '...';
       }
 
       // Enviar respuesta al chat del juego
@@ -176,7 +215,8 @@ class ChatAssistant {
       hytale:            'Hytale'
     };
     const gameName = gameNames[gameId] ?? gameId;
-    return `${this.systemPrompt}\n\nContexto: el servidor de juego es ${gameName}.\nEl jugador "${player}" dice: "${question}"\n\nResponde directamente:`;
+    const basePrompt = this.getGamePrompt(gameId) || this.systemPrompt;
+    return `${basePrompt}\n\nContexto: el servidor de juego es ${gameName}.\nEl jugador "${player}" dice: "${question}"\n\nResponde directamente:`;
   }
 }
 

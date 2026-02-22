@@ -19,7 +19,9 @@ const {
   getAIConfig,
   saveAIConfig,
   getAISystemPrompt,
-  saveAISystemPrompt
+  saveAISystemPrompt,
+  getAIGamePrompt,
+  saveAIGamePrompt
 } = require("./serverManager");
 const { log, logError } = require("./logger");
 const chatAssistant = require("./services/ai/ChatAssistant");
@@ -90,9 +92,15 @@ async function initChatAssistant() {
   chatAssistant.logFn = broadcast;
   chatAssistant.sendChatFn = buildSendChatFn();
 
-  // Cargar prompt personalizado si existe
+  // Cargar prompt general personalizado si existe
   const savedPrompt = await getAISystemPrompt();
   if (savedPrompt) chatAssistant.setSystemPrompt(savedPrompt);
+
+  // Cargar prompts específicos por juego
+  for (const gameId of ['minecraft', 'hytale']) {
+    const gamePrompt = await getAIGamePrompt(gameId);
+    if (gamePrompt) chatAssistant.setGamePrompt(gameId, gamePrompt);
+  }
 
   log(`AI: Asistente "God" activo (${chatAssistant.provider})`);
 }
@@ -349,11 +357,32 @@ async function handleRequest(req, res) {
           chatAssistant.setSystemPrompt(prompt);
           log("AI: Prompt del asistente actualizado");
         } else {
-          // Prompt vacío = restaurar default
           await saveAISystemPrompt(null);
           chatAssistant.setSystemPrompt(null);
           log("AI: Prompt del asistente restaurado al default");
         }
+        return sendJson(res, 200, { ok: true, message: "Prompt actualizado." });
+      }
+    }
+
+    // ── Endpoints de prompt específico por juego ──────────────────────────
+    if (parts.length === 3 && parts[0] === "ai" && parts[1] === "prompt") {
+      const gameKey = normalizeGameId(parts[2]); // 'minecraft' | 'hytale'
+
+      if (req.method === "GET") {
+        const gamePrompt = await getAIGamePrompt(gameKey);
+        return sendJson(res, 200, {
+          ok: true,
+          data: { prompt: gamePrompt || "", isDefault: !gamePrompt }
+        });
+      }
+
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        const prompt = body.prompt?.trim() || "";
+        await saveAIGamePrompt(gameKey, prompt || null);
+        chatAssistant.setGamePrompt(gameKey, prompt || null);
+        log(`AI: Prompt de ${gameKey} ${prompt ? "actualizado" : "restaurado al general"}`);
         return sendJson(res, 200, { ok: true, message: "Prompt actualizado." });
       }
     }
