@@ -180,7 +180,6 @@ async function extractArchive(archivePath, targetDir) {
 function runCommand(bin, args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { cwd, stdio: "ignore", detached: true });
-    child.unref();
     child.on("exit", (code) => {
       if (code === 0) {
         resolve();
