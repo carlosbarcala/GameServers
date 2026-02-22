@@ -21,7 +21,9 @@ const {
   getAISystemPrompt,
   saveAISystemPrompt,
   getAIGamePrompt,
-  saveAIGamePrompt
+  saveAIGamePrompt,
+  getAIAgentPrompt,
+  saveAIAgentPrompt
 } = require("./serverManager");
 const { log, logError } = require("./logger");
 const chatAssistant = require("./services/ai/ChatAssistant");
@@ -57,15 +59,17 @@ async function loadEnv() {
   }
 }
 
-// Función que envía un mensaje al chat del juego como "God"
+// Función que envía un mensaje al chat del juego (God o Agent)
 function buildSendChatFn() {
-  return async (gameId, message) => {
+  return async (gameId, message, prefix = 'God') => {
     const gameStatus = await status();
     const screenName = gameStatus[gameId]?.screenName;
     if (!screenName) return;
-    const cmd = gameId === "hytale" ? `broadcast [God] ${message}` : `say [God] ${message}`;
+    const cmd = gameId === "hytale"
+      ? `broadcast [${prefix}] ${message}`
+      : `say [${prefix}] ${message}`;
     await sendCommandToScreen(screenName, cmd);
-    broadcast(`${gameId} [God]: ${message}`);
+    broadcast(`${gameId} [${prefix}]: ${message}`);
   };
 }
 
@@ -96,11 +100,15 @@ async function initChatAssistant() {
   const savedPrompt = await getAISystemPrompt();
   if (savedPrompt) chatAssistant.setSystemPrompt(savedPrompt);
 
-  // Cargar prompts específicos por juego
+  // Cargar prompts específicos por juego (God)
   for (const gameId of ['minecraft', 'hytale']) {
     const gamePrompt = await getAIGamePrompt(gameId);
     if (gamePrompt) chatAssistant.setGamePrompt(gameId, gamePrompt);
   }
+
+  // Cargar prompt del agente
+  const savedAgentPrompt = await getAIAgentPrompt();
+  if (savedAgentPrompt) chatAssistant.setAgentPrompt(savedAgentPrompt);
 
   log(`AI: Asistente "God" activo (${chatAssistant.provider})`);
 }
@@ -387,13 +395,38 @@ async function handleRequest(req, res) {
       }
     }
 
+    // ── Endpoint de prompt del agente ─────────────────────────────────────
+    if (parts.length === 2 && parts[0] === "ai" && parts[1] === "agent-prompt") {
+      if (req.method === "GET") {
+        const savedAgentPrompt = await getAIAgentPrompt();
+        return sendJson(res, 200, {
+          ok: true,
+          data: {
+            prompt: savedAgentPrompt || chatAssistant.getDefaultAgentPrompt(),
+            isDefault: !savedAgentPrompt
+          }
+        });
+      }
+
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        const prompt = body.prompt?.trim() || "";
+        await saveAIAgentPrompt(prompt || null);
+        chatAssistant.setAgentPrompt(prompt || null);
+        log(`AI: Prompt del agente ${prompt ? "actualizado" : "restaurado al default"}`);
+        return sendJson(res, 200, { ok: true, message: "Prompt del agente actualizado." });
+      }
+    }
+
     if (parts.length === 3 && parts[0] === "games") {
       const gameId = normalizeGameId(parts[1]);
 
       if (parts[2] === "restart" && req.method === "POST") {
+        chatAssistant.deactivateServer(gameId);
         const result = await restartGame(gameId, broadcast);
         startLogStream(gameId, broadcast, (gid, line) => chatAssistant.processLine(gid, line))
           .catch(err => logError(`Error log stream: ${err.message}`));
+        chatAssistant.activateServer(gameId);
         return sendJson(res, 200, result);
       }
 
@@ -401,10 +434,12 @@ async function handleRequest(req, res) {
         const result = await startInstalledGame(gameId, broadcast);
         startLogStream(gameId, broadcast, (gid, line) => chatAssistant.processLine(gid, line))
           .catch(err => logError(`Error log stream: ${err.message}`));
+        chatAssistant.activateServer(gameId);
         return sendJson(res, 200, result);
       }
 
       if (parts[2] === "stop" && req.method === "POST") {
+        chatAssistant.deactivateServer(gameId);
         const result = await stopGame(gameId, broadcast);
         return sendJson(res, 200, result);
       }
@@ -483,7 +518,7 @@ async function bootstrap() {
   await ensureRuntimeContext();
   await initChatAssistant();
 
-  // Iniciar log streaming para juegos que ya estén corriendo
+  // Iniciar log streaming y vigilancia God para juegos que ya estén corriendo
   const currentStatus = await status();
   for (const [gameId, info] of Object.entries(currentStatus)) {
     if (info.running) {
@@ -491,6 +526,7 @@ async function bootstrap() {
         .catch(err => {
           logError(`Error iniciando log stream para ${gameId} en bootstrap`, err);
         });
+      chatAssistant.activateServer(gameId);
     }
   }
 

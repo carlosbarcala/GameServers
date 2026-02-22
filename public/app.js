@@ -338,7 +338,15 @@ const aiPromptTextareas = {
   general:   document.getElementById("aiPromptTextarea"),
   minecraft: document.getElementById("aiPromptMinecraft"),
   hytale:    document.getElementById("aiPromptHytale"),
+  agent:     document.getElementById("aiPromptAgent"),
 };
+
+// URL de cada pestaña
+function promptUrl(target) {
+  if (target === "general")  return "/ai/prompt";
+  if (target === "agent")    return "/ai/agent-prompt";
+  return `/ai/prompt/${target}`;
+}
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 document.querySelectorAll(".ai-tab-btn").forEach(btn => {
@@ -365,14 +373,16 @@ aiPromptModal.addEventListener("click", (e) => {
 // ── Carga de prompts ──────────────────────────────────────────────────────────
 async function loadAllPrompts() {
   try {
-    const [general, minecraft, hytale] = await Promise.all([
+    const [general, minecraft, hytale, agent] = await Promise.all([
       request("/ai/prompt"),
       request("/ai/prompt/minecraft"),
       request("/ai/prompt/hytale"),
+      request("/ai/agent-prompt"),
     ]);
     aiPromptTextareas.general.value   = general.data.prompt;
     aiPromptTextareas.minecraft.value = minecraft.data.prompt;
     aiPromptTextareas.hytale.value    = hytale.data.prompt;
+    aiPromptTextareas.agent.value     = agent.data.prompt;
   } catch (error) {
     pushLog(`Error cargando prompts: ${error.message}`);
   }
@@ -385,9 +395,8 @@ document.querySelectorAll(".ai-save-btn").forEach(btn => {
     const prompt = aiPromptTextareas[target].value.trim();
     if (!prompt) return;
     try {
-      const url = target === "general" ? "/ai/prompt" : `/ai/prompt/${target}`;
-      await request(url, "POST", { prompt });
-      pushLog(`God: prompt de ${target} actualizado`);
+      await request(promptUrl(target), "POST", { prompt });
+      pushLog(`AI: prompt de ${target} actualizado`);
     } catch (error) {
       pushLog(`Error guardando prompt: ${error.message}`);
     }
@@ -398,10 +407,9 @@ document.querySelectorAll(".ai-reset-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
     const target = btn.dataset.target;
     try {
-      const url = target === "general" ? "/ai/prompt" : `/ai/prompt/${target}`;
-      await request(url, "POST", { prompt: "" });
+      await request(promptUrl(target), "POST", { prompt: "" });
       await loadAllPrompts();
-      pushLog(`God: prompt de ${target} restaurado`);
+      pushLog(`AI: prompt de ${target} restaurado`);
     } catch (error) {
       pushLog(`Error restaurando prompt: ${error.message}`);
     }

@@ -408,6 +408,19 @@ h1 {
   color: var(--text);
 }
 
+.ai-tab-agent {
+  margin-left: auto;
+  border-color: rgba(120, 200, 140, 0.3);
+  color: #78c88c;
+}
+
+.ai-tab-agent:hover,
+.ai-tab-agent.active {
+  background: rgba(120, 200, 140, 0.12);
+  border-color: #78c88c;
+  color: #78c88c;
+}
+
 .ai-tab-panel {
   display: none;
   flex: 1;

@@ -624,6 +624,19 @@ async function saveAISystemPrompt(prompt) {
   return { ok: true, message: "Prompt del asistente guardado." };
 }
 
+async function getAIAgentPrompt() {
+  const state = await readState();
+  return state._ai?.agentPrompt || null;
+}
+
+async function saveAIAgentPrompt(prompt) {
+  const state = await readState();
+  if (!state._ai) state._ai = {};
+  state._ai.agentPrompt = prompt || null;
+  await writeState(state);
+  return { ok: true, message: "Prompt del agente guardado." };
+}
+
 async function getAIGamePrompt(gameId) {
   const state = await readState();
   return state._ai?.gamePrompts?.[gameId] || null;
@@ -704,5 +717,7 @@ module.exports = {
   getAISystemPrompt,
   saveAISystemPrompt,
   getAIGamePrompt,
-  saveAIGamePrompt
+  saveAIGamePrompt,
+  getAIAgentPrompt,
+  saveAIAgentPrompt
 };

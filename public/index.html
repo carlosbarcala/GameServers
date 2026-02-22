@@ -37,13 +37,14 @@
 
     <dialog id="aiPromptModal" class="ai-modal">
       <div class="ai-modal-header">
-        <span class="terminal-title">Asistente God &mdash; Prompts del sistema</span>
+        <span class="terminal-title">Asistentes AI &mdash; Prompts del sistema</span>
         <button id="aiPromptCloseBtn" class="btn btn-soft ai-modal-close">✕</button>
       </div>
       <div class="ai-prompt-tabs">
-        <button class="ai-tab-btn active" data-tab="general">General</button>
-        <button class="ai-tab-btn" data-tab="minecraft">Minecraft</button>
-        <button class="ai-tab-btn" data-tab="hytale">Hytale</button>
+        <button class="ai-tab-btn active" data-tab="general">God &mdash; General</button>
+        <button class="ai-tab-btn" data-tab="minecraft">God &mdash; Minecraft</button>
+        <button class="ai-tab-btn" data-tab="hytale">God &mdash; Hytale</button>
+        <button class="ai-tab-btn ai-tab-agent" data-tab="agent">@agent</button>
       </div>
       <div class="ai-tab-panel active" data-panel="general">
         <p class="ai-tab-hint">Prompt base usado cuando no hay uno específico para el juego.</p>
@@ -67,6 +68,14 @@
         <div class="ai-modal-actions">
           <button class="btn btn-primary ai-save-btn" data-target="hytale">Guardar</button>
           <button class="btn btn-soft ai-reset-btn" data-target="hytale">Usar prompt general</button>
+        </div>
+      </div>
+      <div class="ai-tab-panel" data-panel="agent">
+        <p class="ai-tab-hint">Perfil @agent: asistente general sin personalidad. Los jugadores lo invocan escribiendo @agent en el chat.</p>
+        <textarea id="aiPromptAgent" class="ai-modal-textarea"></textarea>
+        <div class="ai-modal-actions">
+          <button class="btn btn-primary ai-save-btn" data-target="agent">Guardar</button>
+          <button class="btn btn-soft ai-reset-btn" data-target="agent">Restaurar por defecto</button>
         </div>
       </div>
     </dialog>
