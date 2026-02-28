@@ -77,3 +77,29 @@ curl -u user:pass -X POST http://127.0.0.1:3000/games/minecraft_bedrock/restart
 # Borrar Hytale
 curl -u user:pass -X DELETE http://127.0.0.1:3000/games/hytale
 ```
+
+## Asistente de IA en el chat
+
+El servidor incluye dos asistentes de IA que participan en el chat del juego.
+
+### God
+
+Deidad errática y perturbada que rige el servidor. Los jugadores lo invocan con `@god`.
+
+- Lee el historial reciente del chat (últimos 20 mensajes) para dar respuestas con contexto.
+- Lanza comentarios espontáneos cada 3-15 minutos si hay conversación activa.
+- Las respuestas se trocean en fragmentos de máximo 100 caracteres por palabras y se envían secuencialmente.
+
+### Agent
+
+Asistente útil y neutro. Los jugadores lo invocan con `@agent`.
+
+- Responde únicamente a la pregunta concreta del jugador, sin contexto de conversación.
+- Las respuestas también se trocean en fragmentos de máximo 100 caracteres.
+
+### Configuración de la IA
+
+Desde el panel web se puede configurar:
+- Proveedor y clave de API (OpenAI, Gemini, Claude, Ollama)
+- Prompt de God (global y por juego)
+- Prompt de Agent
