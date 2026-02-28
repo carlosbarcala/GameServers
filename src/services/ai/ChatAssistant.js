@@ -4,13 +4,6 @@ const AIServiceFactory = require('./AIServiceFactory');
 const GOD_MENTION   = /@god\b/i;
 const AGENT_MENTION = /@agent\b/i;
 
-// Límites de caracteres por tipo de juego
-const GAME_CHAR_LIMITS = {
-  minecraft_java:    100,
-  minecraft_bedrock: 100,
-  hytale:            200,
-};
-
 // Buffer de conversación
 const BUFFER_SIZE = 50;
 const CONTEXT_LINES = 20; // cuántos mensajes recientes incluir en el prompt
@@ -28,6 +21,29 @@ function sanitizeMessage(text) {
     .replace(/[\[\]{}<>()"'`\\|^~@#$%&*_=+]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Trocea un texto en fragmentos de máximo `maxChars` caracteres,
+ * cortando siempre por palabras (nunca parte una palabra a la mitad).
+ */
+function chunkByWords(text, maxChars = 100) {
+  const words = text.split(' ');
+  const chunks = [];
+  let current = '';
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+    } else {
+      if (current) chunks.push(current);
+      // Si la palabra sola supera el límite, córtala por la fuerza
+      current = word.length <= maxChars ? word : word.slice(0, maxChars);
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
 }
 
 // Prompt por defecto para God (se puede sobreescribir desde el panel)
@@ -203,11 +219,11 @@ class ChatAssistant {
       response = response.trim().replace(/\n+/g, ' ').trim();
       response = sanitizeMessage(response);
 
-      const limit = GAME_CHAR_LIMITS[gameId] ?? 200;
-      if (response.length > limit) response = response.slice(0, limit - 3) + '...';
-
-      await this.sendChatFn(gameId, response, 'God');
-      this.logFn?.(`[God] Comentario espontáneo en ${gameId}: "${response}"`);
+      const chunks = chunkByWords(response, 100);
+      for (const chunk of chunks) {
+        await this.sendChatFn(gameId, chunk, 'God');
+      }
+      this.logFn?.(`[God] Comentario espontáneo en ${gameId} (${chunks.length} trozos): "${response}"`);
     } catch (err) {
       this.logFn?.(`[God] Error en comentario espontáneo: ${err.message}`);
     } finally {
@@ -268,12 +284,12 @@ class ChatAssistant {
       response = response.trim().replace(/\n+/g, ' ').trim();
       response = sanitizeMessage(response);
 
-      const limit = GAME_CHAR_LIMITS[gameId] ?? 200;
-      if (response.length > limit) response = response.slice(0, limit - 3) + '...';
-
       if (this.sendChatFn) {
-        await this.sendChatFn(gameId, response, prefix);
-        this.logFn?.(`[${prefix}] Respuesta enviada en ${gameId}: "${response}"`);
+        const chunks = chunkByWords(response, 100);
+        for (const chunk of chunks) {
+          await this.sendChatFn(gameId, chunk, prefix);
+        }
+        this.logFn?.(`[${prefix}] Respuesta enviada en ${gameId} (${chunks.length} trozos): "${response}"`);
       }
     } catch (err) {
       this.logFn?.(`[${prefix}] Error al generar respuesta: ${err.message}`);
